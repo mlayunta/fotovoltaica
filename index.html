@@ -1,0 +1,2014 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#10243b">
+<meta name="description" content="Predimensionamiento fotovoltaico profesional: simulación horaria de 8.760 intervalos, almacenamiento, análisis económico (VAN, TIR, LCOE) y verificación técnica.">
+<meta name="author" content="Miguel Ángel Layunta López">
+<meta name="color-scheme" content="light dark">
+
+<title>Solar Layunta · Ingeniería solar avanzada</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon.svg">
+
+<!-- Dependencias externas. Si fallan, la app degrada con aviso (ver init()). -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" defer></script>
+
+<style>
+  :root{
+    color-scheme: light;
+    --navy:#10243b; --navy2:#1a3c5a; --gold:#f5b942; --gold-ink:#2f2209;
+    --bg:#f1f5f9; --card:#ffffff; --text:#1b2d3e; --muted:#586d80;
+    --line:#dbe5ef; --shadow:0 10px 30px rgba(15,35,55,.08);
+    --ok-bg:#eaf8f1; --ok-fg:#145b40;
+    --warn-bg:#fff3d8; --warn-fg:#765000;
+    --bad-bg:#fff0ee; --bad-fg:#a3221a;
+    --info-bg:#eaf2fb; --info-fg:#1c4a75;
+    --radius:14px;
+    --font: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  }
+  [data-theme="dark"]{
+    color-scheme: dark;
+    --navy:#e2e8f0; --navy2:#cbd5e1; --gold:#f5b942; --gold-ink:#2f2209;
+    --bg:#0f172a; --card:#1e293b; --text:#f8fafc; --muted:#94a3b8;
+    --line:#334155; --shadow:0 10px 30px rgba(0,0,0,.35);
+    --ok-bg:#064e3b; --ok-fg:#a7f3d0;
+    --warn-bg:#78350f; --warn-fg:#fde68a;
+    --bad-bg:#7f1d1d; --bad-fg:#fecaca;
+    --info-bg:#1e3a5f; --info-fg:#bfdbfe;
+  }
+
+  *,*::before,*::after{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--font); line-height:1.5;
+    transition:background .25s ease, color .25s ease;
+  }
+  h1,h2,h3{line-height:1.25}
+  h1{margin:0 0 6px; font-size:clamp(1.6rem,3.6vw,2.4rem); letter-spacing:-.03em}
+  h2{margin:0 0 6px; font-size:1.15rem}
+  h3{margin:22px 0 8px; font-size:.98rem; text-transform:uppercase; letter-spacing:.05em; color:var(--muted)}
+  p{margin:0 0 10px}
+  a{color:var(--navy2)}
+  [data-theme="dark"] a{color:#60a5fa}
+
+  /* ---------- Estructura ---------- */
+  .wrap{width:min(1560px,100%); margin:0 auto}
+  header{
+    color:#fff; padding:26px 20px 32px;
+    background:
+      radial-gradient(circle at 88% 0%, rgba(245,185,66,.22), transparent 32%),
+      linear-gradient(135deg,#10243b,#1a3c5a);
+  }
+  .brand{display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap}
+  .brand-left{display:flex; align-items:center; gap:16px}
+  .brand img{width:72px; height:72px; border-radius:18px; flex:0 0 auto; background:rgba(255,255,255,.08)}
+  header p{margin:0; color:#dce8f4; max-width:70ch}
+  .author{display:inline-block; margin-top:8px; color:#ffe1a1; font-weight:700; font-size:.9rem}
+  .header-actions{display:flex; gap:8px; flex-wrap:wrap}
+
+  main{padding:20px}
+  footer{padding:0 20px 34px; color:var(--muted); font-size:.82rem}
+
+  .layout{
+    display:grid;
+    grid-template-columns:minmax(330px,440px) minmax(0,1fr);
+    gap:20px; align-items:start;
+  }
+  @media (max-width:1000px){ .layout{grid-template-columns:1fr} }
+
+  /* ---------- Tarjetas ---------- */
+  .card{
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); padding:20px; margin-bottom:18px;
+    box-shadow:var(--shadow);
+  }
+  .card > h2{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+  .card-sub{color:var(--muted); font-size:.85rem; margin:0 0 12px}
+
+  .notice{
+    border:1px solid #f3d38d; border-left:5px solid var(--gold);
+    background:#fff8e9; color:#33270a;
+    border-radius:10px; padding:14px 16px; margin-bottom:18px; font-size:.9rem;
+  }
+  [data-theme="dark"] .notice{background:#3d3115; color:#fef08a; border-color:#ca8a04}
+
+  /* ---------- Formulario ---------- */
+  details{border-top:1px solid var(--line); padding:12px 0}
+  details:first-of-type{margin-top:12px}
+  summary{cursor:pointer; font-weight:750; color:var(--navy); padding:4px 0; user-select:none}
+  [data-theme="dark"] summary{color:#60a5fa}
+  summary::marker{color:var(--gold)}
+  .fields{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding-top:12px}
+  @media (max-width:520px){ .fields{grid-template-columns:1fr} }
+  label{display:block; font-size:.78rem; font-weight:650}
+  label > span{display:block; margin-bottom:5px; line-height:1.35}
+  input,select{
+    width:100%; min-height:40px; padding:9px;
+    border:1px solid var(--line); border-radius:8px;
+    background:var(--card); color:var(--text); font:inherit; font-size:.88rem;
+  }
+  input:focus-visible,select:focus-visible,button:focus-visible,summary:focus-visible{
+    outline:3px solid rgba(245,185,66,.55); outline-offset:2px;
+  }
+  input:invalid:not(:placeholder-shown){border-color:#e08a80}
+
+  .actions{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+  button{
+    border:1px solid transparent; border-radius:9px; padding:10px 14px;
+    background:var(--navy2); color:#fff; font:inherit; font-weight:700;
+    font-size:.86rem; cursor:pointer; transition:filter .15s ease, transform .05s ease;
+  }
+  button:hover{filter:brightness(1.12)}
+  button:active{transform:translateY(1px)}
+  button:disabled{opacity:.5; cursor:not-allowed}
+  button.secondary{background:var(--card); color:var(--text); border-color:var(--line)}
+  button.gold{background:var(--gold); color:var(--gold-ink)}
+  button.danger{background:var(--card); color:#b91c1c; border-color:#f0c4c0}
+  [data-theme="dark"] button.danger{color:#fca5a5; border-color:#7f1d1d}
+  button.ghost{background:rgba(255,255,255,.15); border-color:rgba(255,255,255,.3); color:#fff}
+
+  .file-box{
+    padding:12px; background:var(--bg); border:1px solid var(--line);
+    border-radius:10px; margin-top:12px;
+  }
+  .file-box.highlight{background:var(--card); border-color:var(--gold)}
+  .file-box label{font-weight:700; margin-bottom:6px; display:block}
+  code{overflow-wrap:anywhere; font-size:.85em; background:rgba(127,127,127,.12); padding:1px 4px; border-radius:4px}
+
+  .msg{margin-top:12px; font-size:.85rem; border-radius:8px; padding:10px 12px; display:none}
+  .msg.show{display:block}
+  .msg.ok{background:var(--ok-bg); color:var(--ok-fg)}
+  .msg.warn{background:var(--warn-bg); color:var(--warn-fg)}
+  .msg.bad{background:var(--bad-bg); color:var(--bad-fg)}
+
+  /* ---------- Métricas ---------- */
+  .metrics{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-top:14px}
+  .metric{background:var(--bg); border:1px solid var(--line); border-radius:11px; padding:13px}
+  .metric span{display:block; color:var(--muted); font-size:.75rem; text-transform:uppercase; letter-spacing:.04em}
+  .metric strong{display:block; margin:6px 0 2px; font-size:clamp(1.05rem,1.8vw,1.4rem); letter-spacing:-.02em}
+  .metric em{color:var(--muted); font-size:.75rem; font-style:normal}
+  .metric.good strong{color:#14805a}
+  .metric.bad strong{color:#b3261e}
+  [data-theme="dark"] .metric.good strong{color:#6ee7b7}
+  [data-theme="dark"] .metric.bad strong{color:#fca5a5}
+  /* ---------- Traza de cálculo (modo auditoría) ---------- */
+  .metric-trace{margin-top:8px; border-top:1px dashed var(--line); padding:6px 0 0}
+  .metric-trace summary{font-size:.72rem; font-weight:600; color:var(--muted); padding:2px 0}
+  .metric-trace pre{
+    margin:6px 0 0; padding:8px; background:var(--card); border:1px solid var(--line);
+    border-radius:6px; font-size:.7rem; line-height:1.45; white-space:pre-wrap;
+    overflow-wrap:anywhere; color:var(--muted);
+  }
+  .badge.ok{background:var(--ok-bg); color:var(--ok-fg)}
+  .badge.warn{background:var(--warn-bg); color:var(--warn-fg)}
+  .badge.bad{background:var(--bad-bg); color:var(--bad-fg)}
+
+  /* ---------- Tablas ---------- */
+  .table-wrap{overflow-x:auto; margin-top:12px; -webkit-overflow-scrolling:touch}
+  table{width:100%; border-collapse:collapse; font-size:.84rem}
+  th,td{border-bottom:1px solid var(--line); padding:8px; text-align:right; white-space:nowrap}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--muted); font-size:.74rem; text-transform:uppercase; letter-spacing:.04em; font-weight:700}
+  tbody tr:hover{background:rgba(127,127,127,.06)}
+  tfoot td{font-weight:750; border-top:2px solid var(--line)}
+
+  /* ---------- Estados ---------- */
+  .status{border-radius:8px; padding:10px 12px; margin:8px 0; font-size:.87rem; line-height:1.5; border-left:4px solid transparent}
+  .status.ok{background:var(--ok-bg); color:var(--ok-fg); border-left-color:#2f9e6f}
+  .status.warn{background:var(--warn-bg); color:var(--warn-fg); border-left-color:#d99b1a}
+  .status.bad{background:var(--bad-bg); color:var(--bad-fg); border-left-color:#d1453a}
+  .status.info{background:var(--info-bg); color:var(--info-fg); border-left-color:#3b82c4}
+  .status strong{font-weight:750}
+
+  /* ---------- Gráficas ---------- */
+  .chart-container{position:relative; width:100%; height:290px; margin:14px 0}
+  .chart-container.short{height:230px}
+  .chart-fallback{
+    display:none; padding:18px; text-align:center; color:var(--muted);
+    border:1px dashed var(--line); border-radius:10px; font-size:.85rem;
+  }
+
+  /* ---------- Listas ---------- */
+  .limitations{margin:0; padding-left:20px; font-size:.86rem; color:var(--muted)}
+  .limitations li{margin-bottom:6px}
+  .hypotheses{margin:0; padding-left:20px; font-size:.84rem}
+  .hypotheses li{margin-bottom:5px}
+
+  .badge{
+    display:inline-block; padding:2px 8px; border-radius:999px;
+    font-size:.7rem; font-weight:750; text-transform:uppercase; letter-spacing:.04em;
+    background:var(--info-bg); color:var(--info-fg);
+  }
+  .badge.gold{background:rgba(245,185,66,.22); color:#7a5200}
+  [data-theme="dark"] .badge.gold{color:#fcd34d}
+
+  .kpi-inline{display:flex; flex-wrap:wrap; gap:10px; margin-top:10px}
+  .kpi-inline div{
+    background:var(--bg); border:1px solid var(--line); border-radius:9px;
+    padding:8px 12px; font-size:.82rem;
+  }
+  .kpi-inline b{display:block; font-size:1.05rem}
+
+  /* ---------- Impresión ---------- */
+  @media print{
+    body{background:#fff !important; color:#000 !important}
+    .no-print{display:none !important}
+    .card{box-shadow:none; border:1px solid #ccc; break-inside:avoid; page-break-inside:avoid}
+    header{background:#10243b !important; -webkit-print-color-adjust:exact; print-color-adjust:exact}
+    .layout{grid-template-columns:1fr}
+    .chart-container{height:220px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<header class="no-print">
+  <div class="wrap brand">
+    <div class="brand-left">
+      <img src="icons/icon.svg" alt="Icono Solar Layunta" width="72" height="72">
+      <div>
+        <h1>Solar Layunta</h1>
+        <p>Predimensionamiento fotovoltaico, almacenamiento y análisis económico avanzado.</p>
+        <span class="author">Autor: Miguel Ángel Layunta López</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="ghost" id="themeToggle" type="button" aria-pressed="false">🌓 Modo oscuro</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="notice no-print" role="note">
+    <strong>Herramienta de predimensionamiento.</strong> Los resultados son orientativos y no sustituyen
+    un proyecto ejecutivo, el cálculo oficial de PVGIS ni la verificación de un técnico competente.
+    Consulta la tarjeta <em>Hipótesis y limitaciones</em> antes de usar las cifras.
+  </div>
+
+  <div class="layout">
+    <!-- ===================== EDITOR ===================== -->
+    <aside id="editor" class="no-print">
+      <form id="projectForm" class="card" novalidate>
+        <h2>⚙️ Configuración del proyecto</h2>
+        <p class="card-sub">Rellena los datos y pulsa <strong>Calcular simulación</strong>. Los campos están agrupados por bloques.</p>
+
+        <div id="formSections"></div>
+
+        <div class="file-box">
+          <label for="loadFile">📄 Curva de consumo horaria (CSV)</label>
+          <input id="loadFile" type="file" accept=".csv,text/csv">
+          <p class="card-sub" style="margin:6px 0 0">Una columna <code>kWh</code> con exactamente 8.760 valores horarios.</p>
+          <div class="actions">
+            <button type="button" class="secondary" id="clearLoad">Quitar curva</button>
+          </div>
+          <p id="loadStatus" class="card-sub" role="status" style="margin:8px 0 0">Se usará un perfil sintético.</p>
+        </div>
+
+        <div class="file-box">
+          <label for="solarFile">☀️ Producción horaria PVGIS (JSON)</label>
+          <input id="solarFile" type="file" accept=".json,application/json">
+          <p class="card-sub" style="margin:6px 0 0">Archivo con <code>outputs.hourly</code> y campo <code>P</code> (W).</p>
+          <div class="actions">
+            <button type="button" class="secondary" id="clearSolar">Quitar producción</button>
+          </div>
+          <p id="solarStatus" class="card-sub" role="status" style="margin:8px 0 0">Se usará el modelo solar analítico.</p>
+        </div>
+
+        <div class="file-box">
+          <label for="tariffFile">💶 Precios horarios (CSV)</label>
+          <input id="tariffFile" type="file" accept=".csv,text/csv">
+          <p class="card-sub" style="margin:6px 0 0">Dos columnas: <code>compra;excedente</code> (8.760 filas).</p>
+          <div class="actions">
+            <button type="button" class="secondary" id="clearTariff">Quitar precios</button>
+          </div>
+          <p id="tariffStatus" class="card-sub" role="status" style="margin:8px 0 0">Se usarán los precios del formulario.</p>
+        </div>
+
+        <div class="file-box highlight">
+          <label for="projectSelector">📁 Gestor de proyectos guardados</label>
+          <select id="projectSelector">
+            <option value="">— Seleccionar proyecto guardado —</option>
+          </select>
+          <div class="actions">
+            <button type="button" class="secondary" id="loadProjectBtn">Cargar</button>
+            <button type="button" class="secondary" id="saveAsProjectBtn">Guardar como…</button>
+            <button type="button" class="danger" id="deleteProjectBtn">Eliminar</button>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="submit" class="gold">☀ Calcular simulación</button>
+          <button type="button" class="secondary" id="saveBtn">Guardar actual</button>
+          <button type="button" class="secondary" id="resetBtn">Restablecer</button>
+        </div>
+
+        <p id="formMessage" class="msg" role="status" aria-live="polite"></p>
+      </form>
+    </aside>
+
+    <!-- ===================== RESULTADOS ===================== -->
+    <section id="pdfExportArea">
+
+      <div class="card">
+        <h2>📊 Resumen del proyecto</h2>
+        <p id="projectSummary" class="card-sub"></p>
+        <div id="metrics" class="metrics"></div>
+      </div>
+
+      <div class="card">
+	  <h2>🧭 Procedencia de los datos</h2>
+        <p class="card-sub">Nivel de confianza del resultado según las series que hayas aportado.</p>
+        <div id="provenance"></div>
+      </div>
+	  <div class="card">
+        <h2>🔆 Producción y balance mensual</h2>
+        <p class="card-sub">Energía fotovoltaica AC, demanda, autoconsumo directo, compra y excedentes.</p>
+        <div class="chart-container"><canvas id="monthlyChartCanvas"></canvas></div>
+        <div class="chart-fallback" id="monthlyChartFallback">Gráfica no disponible (Chart.js no cargado). Los datos siguen en la tabla inferior.</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Mes</th><th>FV AC · kWh</th><th>Demanda · kWh</th><th>Directo · kWh</th>
+                <th>Batería · kWh</th><th>Compra · kWh</th><th>Excedente · kWh</th>
+              </tr>
+            </thead>
+            <tbody id="monthRows"></tbody>
+            <tfoot id="monthFoot"></tfoot>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔋 Comparador de escenarios de batería</h2>
+        <p class="card-sub">Cada escenario se simula sobre la misma serie horaria. El VAN se calcula con los parámetros económicos del formulario.</p>
+        <div class="chart-container short"><canvas id="batteryChartCanvas"></canvas></div>
+        <div class="chart-fallback" id="batteryChartFallback">Gráfica no disponible (Chart.js no cargado).</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Batería útil</th><th>Compra · kWh/año</th><th>Excedente · kWh/año</th>
+                <th>Autonomía</th><th>Ahorro bruto</th><th>VAN</th><th>Payback</th>
+              </tr>
+            </thead>
+            <tbody id="scenarioRows"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🧪 Comprobaciones técnicas</h2>
+        <p class="card-sub">Verificación de tensiones, corrientes, ventana MPPT y relación DC/AC.</p>
+        <div id="technical"></div>
+      </div>
+
+      <div class="card">
+        <h2>🔌 Cableado y protecciones</h2>
+        <p class="card-sub">Sección mínima por caída de tensión y comprobación orientativa de ampacidad.</p>
+        <div id="cabling"></div>
+      </div>
+
+      <div class="card">
+        <h2>💰 Economía, pérdidas y degradación</h2>
+        <p class="card-sub">Flujos anuales con degradación FV, escalado de precios y reposición de batería.</p>
+        <div id="finance"></div>
+        <div class="chart-container short"><canvas id="cashflowChartCanvas"></canvas></div>
+        <div class="chart-fallback" id="cashflowChartFallback">Gráfica no disponible (Chart.js no cargado).</div>
+      </div>
+
+           <div class="card no-print" id="uncertaintyCard">
+	 <h2>🎲 Análisis de incertidumbre</h2>
+        <p class="card-sub">Simulación Monte Carlo sobre GHI, consumo, precio y degradación. Devuelve el rango del VAN.</p>
+        <div class="actions no-print">
+          <button type="button" id="mcBtn" class="secondary">Ejecutar Monte Carlo</button>
+        </div>
+        <div id="uncertainty"></div>
+      </div>
+
+<div class="card no-print">	  
+        <h2>📤 Entregables e informes</h2>
+        <p class="card-sub">Exporta los datos o genera un informe ejecutivo en PDF.</p>
+        <div class="actions">
+          <button type="button" id="pdfBtn" class="gold">📄 Informe PDF</button>
+          <button type="button" id="csvBtn" class="secondary">Balance mensual CSV</button>
+          <button type="button" id="hourlyBtn" class="secondary">Balance horario CSV</button>
+          <button type="button" id="bomBtn" class="secondary">Lista de materiales</button>
+          <button type="button" id="dxfBtn" class="secondary">Plano DXF</button>
+          <button type="button" id="jsonBtn" class="secondary">Proyecto JSON</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔬 Hipótesis del modelo</h2>
+        <p class="card-sub">Todo cálculo tiene supuestos. Estos son los que aplica esta herramienta.</p>
+        <ul class="hypotheses">
+          <li><strong>Geometría solar:</strong> declinación de Cooper, ángulo horario y vector solar por hora centrada.</li>
+          <li><strong>Reparto horario del GHI:</strong> modelo de cielo claro (masa de aire Kasten-Young + atenuación tipo Meinel), renormalizado al GHI mensual introducido.</li>
+          <li><strong>Descomposición directa/difusa:</strong> correlación de Erbs a partir del índice de claridad.</li>
+          <li><strong>Transposición al plano:</strong> modelo isotrópico (Liu-Jordan) con componente reflejada por albedo.</li>
+          <li><strong>Temperatura de célula:</strong> modelo NOCT con temperatura ambiente mensual estimada a partir de media anual y amplitud estacional.</li>
+          <li><strong>Batería:</strong> rendimiento de ciclo completo repartido como raíz cuadrada en carga y descarga; SOC inicial al 50 %.</li>
+          <li><strong>Coeficiente de Isc:</strong> +0,05 %/°C (valor típico de módulo de silicio cristalino).</li>
+          <li><strong>Resistividad del cobre:</strong> 0,0225 Ω·mm²/m (≈70 °C de servicio).</li>
+          <li><strong>Ampacidad:</strong> tabla orientativa tipo B1, 2 conductores, 30 °C ambiente.</li>
+          <li><strong>Economía:</strong> flujos anuales, degradación FV compuesta, escalado de precios y OPEX, reposición de batería y descuento a tipo constante.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h2>⚠️ Alcance y limitaciones</h2>
+        <p class="card-sub">Lo que esta herramienta <strong>no</strong> hace, para que no te lleve a engaño.</p>
+        <ul class="limitations">
+          <li>No realiza análisis de sombreado 3D ni considera obstáculos, chimeneas o árboles.</li>
+          <li>El modelo solar es analítico: no sustituye a PVGIS, Solargis ni a datos de satélite medidos.</li>
+          <li>No hace coordinación de protecciones, selectividad ni cálculo de curvas de disparo.</li>
+          <li>No calcula estructura, cargas de viento o nieve, ni anclajes.</li>
+          <li>El modelo tarifario es simplificado (dos precios + excedentes); no reproduce peajes, cargos ni PVPC horario real.</li>
+          <li>No incluye impuestos, subvenciones, ayudas ni financiación.</li>
+          <li>La ampacidad de cable es orientativa y depende del método de instalación real.</li>
+          <li>No es un proyecto ejecutivo ni un documento válido para legalización.</li>
+        </ul>
+      </div>
+
+    </section>
+  </div>
+</main>
+
+<footer class="wrap no-print">
+  Solar Layunta · Autor: Miguel Ángel Layunta López · Herramienta local de predimensionamiento ·
+  <span id="appVersion"></span>
+</footer>
+
+<script>
+
+/* ============================================================================
+   SOLAR LAYUNTA — Motor de predimensionamiento fotovoltaico
+   ----------------------------------------------------------------------------
+   Organización interna (preparada para dividir en módulos si crece):
+     1. Constantes y utilidades
+     2. Definición del formulario
+     3. Importadores de ficheros
+     4. Motor solar (geometría, transposición, térmica)
+     5. Simulación horaria y batería
+     6. Análisis técnico y cableado
+     7. Economía (VAN, TIR, payback, LCOE)
+     8. Renderizado y gráficas
+     9. Exportación (CSV, BOM, DXF, JSON, PDF)
+    10. Gestión de proyectos y eventos
+   ========================================================================== */
+
+/* ============================ 1. CONSTANTES ============================== */
+
+const APP_VERSION = "3.1.0";
+let importedLoad = null;
+let importedSolar = null;
+let importedTariff = null;
+const HOURS = 8760;
+const MONTHS = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const DAYS = [31,28,31,30,31,30,31,31,30,31,30,31];
+const DEFAULT_GHI = [2.1,2.9,4.0,5.0,6.1,6.8,7.1,6.3,5.1,3.6,2.4,1.9];
+
+/** Resistividad del cobre a temperatura de servicio (Ω·mm²/m). */
+const CU_RHO = 0.0225;
+/** Secciones comerciales normalizadas de cobre (mm²). */
+const CU_SECTIONS = [1.5,2.5,4,6,10,16,25,35,50,70,95,120,150,185,240];
+/** Ampacidad orientativa (A) para Cu, instalación tipo B1, 2 conductores, 30 °C. */
+const CU_AMPACITY = {1.5:15.5,2.5:21,4:28,6:36,10:50,16:68,25:89,35:110,50:134,70:171,95:207,120:239,150:275,185:314,240:370};
+/** Coeficiente de temperatura de Isc (%/°C), valor típico. */
+const ISC_TEMP_COEFF = 0.05;
+
+/** Características orientativas por tecnología de batería. */
+const BATTERY_TECH = {
+  lfp:   { label:"Litio LFP",          cycles:6000, dod:0.90, eff:95 },
+  nmc:   { label:"Litio NMC",          cycles:4000, dod:0.85, eff:94 },
+  lead:  { label:"Plomo estacionario", cycles:1200, dod:0.50, eff:85 },
+  other: { label:"Otra / por definir", cycles:3000, dod:0.80, eff:90 }
+};
+
+/** Base orientativa de capitales de provincia (latitud y GHI mensual kWh/m²/día). */
+const PROVINCES = {
+  "Madrid":              { lat:40.4, ghi:[2.3,3.2,4.5,5.5,6.6,7.2,7.5,6.8,5.4,3.8,2.5,2.0] },
+  "Barcelona":           { lat:41.4, ghi:[2.4,3.3,4.4,5.3,6.2,6.8,7.0,6.4,5.1,3.7,2.6,2.1] },
+  "Valencia":            { lat:39.5, ghi:[2.6,3.5,4.7,5.7,6.8,7.4,7.7,7.0,5.6,4.0,2.8,2.3] },
+  "Sevilla":             { lat:37.4, ghi:[3.0,4.0,5.3,6.3,7.4,8.1,8.4,7.6,6.0,4.3,3.1,2.6] },
+  "Zaragoza":            { lat:41.7, ghi:[2.2,3.1,4.3,5.3,6.4,7.1,7.4,6.6,5.2,3.7,2.4,1.9] },
+  "Bilbao":              { lat:43.3, ghi:[1.7,2.4,3.5,4.4,5.4,6.0,6.2,5.6,4.4,3.0,1.9,1.5] },
+  "Málaga":              { lat:36.7, ghi:[3.1,4.1,5.3,6.3,7.3,8.0,8.2,7.4,5.9,4.3,3.2,2.7] },
+  "Murcia":              { lat:38.0, ghi:[3.0,4.0,5.2,6.2,7.3,8.0,8.2,7.4,5.9,4.2,3.0,2.5] },
+  "Alicante":            { lat:38.3, ghi:[2.9,3.9,5.1,6.1,7.2,7.9,8.1,7.3,5.8,4.1,3.0,2.5] },
+  "Granada":             { lat:37.2, ghi:[2.9,3.9,5.1,6.1,7.2,7.9,8.2,7.4,5.8,4.1,2.9,2.4] },
+  "Valladolid":          { lat:41.7, ghi:[2.0,2.9,4.2,5.2,6.4,7.2,7.5,6.6,5.1,3.5,2.2,1.7] },
+  "Toledo":              { lat:39.9, ghi:[2.5,3.4,4.7,5.7,6.8,7.5,7.8,7.0,5.5,3.9,2.6,2.1] },
+  "Badajoz":             { lat:38.9, ghi:[2.7,3.7,5.0,6.0,7.1,7.8,8.1,7.3,5.8,4.1,2.9,2.4] },
+  "Cáceres":             { lat:39.5, ghi:[2.5,3.5,4.8,5.8,6.9,7.6,7.9,7.1,5.6,3.9,2.7,2.2] },
+  "A Coruña":            { lat:43.4, ghi:[1.6,2.3,3.4,4.4,5.4,6.0,6.2,5.5,4.3,2.9,1.8,1.4] },
+  "Santander":           { lat:43.5, ghi:[1.7,2.4,3.5,4.4,5.3,5.9,6.1,5.5,4.3,3.0,1.9,1.5] },
+  "Pamplona":            { lat:42.8, ghi:[2.0,2.9,4.1,5.1,6.2,7.0,7.3,6.5,5.0,3.5,2.2,1.7] },
+  "Palma":               { lat:39.6, ghi:[2.7,3.6,4.8,5.8,6.9,7.5,7.8,7.1,5.6,4.0,2.8,2.3] },
+  "Las Palmas":          { lat:28.1, ghi:[4.3,5.1,6.0,6.5,6.8,7.0,7.1,6.9,6.3,5.5,4.5,4.0] },
+  "Santa Cruz Tenerife": { lat:28.5, ghi:[4.2,5.0,5.9,6.4,6.7,6.9,7.0,6.8,6.2,5.4,4.4,3.9] }
+};
+
+/* ========================= 2. FORMULARIO ================================= */
+
+const SECTIONS = [
+  {
+    title: "📍 Proyecto y recurso solar",
+    open: true,
+    fields: [
+      { id:"name",    label:"Nombre del proyecto", type:"text",   value:"Proyecto solar" },
+      { id:"profile", label:"Uso de la instalación", type:"select", value:"residential",
+        options:[["residential","Residencial"],["commercial","Comercial"],["industrial","Industrial"]] },
+      { id:"province", label:"Provincia (autorrellena latitud y GHI)", type:"select", value:"",
+        options:[["", "— Personalizado —"], ...Object.keys(PROVINCES).map(k=>[k,k])] },
+      { id:"lat",     label:"Latitud · grados",        type:"number", value:40.4, min:-65, max:65, step:0.1 },
+      { id:"tilt",    label:"Inclinación · grados",    type:"number", value:30,   min:0,  max:90, step:1 },
+      { id:"azimuth", label:"Azimut · 0° norte, 180° sur", type:"number", value:180, min:0, max:360, step:1 },
+      { id:"albedo",  label:"Albedo · fracción",       type:"number", value:0.2,  min:0,  max:1,  step:0.01 },
+      { id:"shade",   label:"Pérdida directa por sombras · %", type:"number", value:5, min:0, max:100, step:1 },
+      { id:"ghis",    label:"GHI mensual · 12 valores kWh/m²/día", type:"text", value:DEFAULT_GHI.join(", ") },
+      { id:"pvgisPeak", label:"Potencia FV usada en PVGIS · kWp", type:"number", value:5.4, min:0.1, max:100000, step:0.1 }
+    ]
+  },
+  {
+    title: "🔧 Módulos e inversor",
+    fields: [
+      { id:"modules",         label:"Número de módulos",           type:"number", value:12,  min:1, max:10000, step:1 },
+      { id:"moduleW",         label:"Potencia por módulo · Wp",    type:"number", value:450, min:50, max:1000, step:1 },
+      { id:"moduleWidth",     label:"Ancho del módulo · m",        type:"number", value:1.13, min:0.3, max:4, step:0.01 },
+      { id:"moduleLength",    label:"Largo del módulo · m",        type:"number", value:1.75, min:0.3, max:5, step:0.01 },
+      { id:"strings",         label:"Número de strings iguales",   type:"number", value:2, min:1, max:1000, step:1 },
+      { id:"parallelStrings", label:"Strings en paralelo por MPPT", type:"number", value:2, min:1, max:1000, step:1 },
+      { id:"voc",             label:"Voc de módulo en STC · V",    type:"number", value:41, min:1, max:100, step:0.1 },
+      { id:"vmpp",            label:"Vmpp de módulo en STC · V",   type:"number", value:34, min:1, max:100, step:0.1 },
+      { id:"isc",             label:"Isc de módulo en STC · A",    type:"number", value:14, min:0.1, max:50, step:0.1 },
+      { id:"impp",            label:"Impp de módulo en STC · A",   type:"number", value:13, min:0.1, max:50, step:0.1 },
+      { id:"vocCoeff",        label:"Coeficiente Voc · %/°C",      type:"number", value:-0.28, min:-1, max:0, step:0.01 },
+      { id:"vmppCoeff",       label:"Coeficiente Vmpp · %/°C",     type:"number", value:-0.35, min:-1, max:0, step:0.01 },
+      { id:"powerCoeff",      label:"Coeficiente potencia · %/°C", type:"number", value:-0.35, min:-1, max:0, step:0.01 },
+      { id:"tmin",            label:"Temperatura mínima de diseño · °C", type:"number", value:-5, min:-50, max:40, step:1 },
+      { id:"tcellmax",        label:"Temperatura máxima de célula · °C", type:"number", value:70, min:25, max:100, step:1 },
+      { id:"inverterKW",      label:"Potencia AC del inversor · kW", type:"number", value:5, min:0.1, max:10000, step:0.1 },
+      { id:"invMaxV",         label:"Tensión máxima DC · V",       type:"number", value:600, min:1, max:2000, step:1 },
+      { id:"mpptMin",         label:"Límite inferior MPPT · V",    type:"number", value:120, min:1, max:2000, step:1 },
+      { id:"mpptMax",         label:"Límite superior MPPT · V",    type:"number", value:500, min:1, max:2000, step:1 },
+      { id:"mpptMaxI",        label:"Corriente máxima MPPT · A",   type:"number", value:30, min:0.1, max:1000, step:0.1 },
+      { id:"mpptMaxIsc",      label:"Isc máxima admisible MPPT · A", type:"number", value:35, min:0.1, max:1000, step:0.1 },
+      { id:"systemLoss",      label:"Otras pérdidas DC · %",       type:"number", value:12, min:0, max:60, step:1 },
+      { id:"invEfficiency",   label:"Rendimiento inversor · %",    type:"number", value:97, min:50, max:100, step:0.1 },
+      { id:"dcAcTarget",      label:"Relación DC/AC objetivo",     type:"number", value:1.2, min:0.5, max:2, step:0.05 }
+    ]
+  },
+  {
+    title: "🌡️ Modelo térmico",
+    fields: [
+      { id:"tambAvg", label:"Temperatura ambiente media anual · °C", type:"number", value:16, min:-10, max:40, step:0.5 },
+      { id:"tambAmp", label:"Amplitud térmica estacional · °C",      type:"number", value:9,  min:0, max:25, step:0.5 },
+      { id:"noct",    label:"NOCT del módulo · °C",                  type:"number", value:45, min:30, max:60, step:1 }
+    ]
+  },
+  {
+    title: "🔋 Consumo y almacenamiento",
+    fields: [
+      { id:"dailyLoad",   label:"Consumo base sintético · kWh/día", type:"number", value:12, min:0, max:100000, step:0.1 },
+      { id:"evDaily",     label:"Vehículo eléctrico adicional · kWh/día", type:"number", value:0, min:0, max:100000, step:0.1 },
+      { id:"heatDaily",   label:"Bomba de calor adicional · kWh/día", type:"number", value:0, min:0, max:100000, step:0.1 },
+      { id:"battery",     label:"Batería útil configurada · kWh",  type:"number", value:5, min:0, max:100000, step:0.1 },
+      { id:"batteryKW",   label:"Potencia carga/descarga · kW",    type:"number", value:3, min:0, max:100000, step:0.1 },
+      { id:"batteryEff",  label:"Rendimiento ciclo completo · %",  type:"number", value:90, min:50, max:100, step:1 },
+      { id:"batteryType", label:"Tecnología prevista", type:"select", value:"lfp",
+        options:[["lfp","Litio LFP"],["nmc","Litio NMC"],["lead","Plomo estacionario"],["other","Otra / por definir"]] },
+      { id:"strategy",    label:"Estrategia de batería", type:"select", value:"self",
+        options:[["self","Autoconsumo"],["peak","Limitación de compra"]] },
+      { id:"peakLimit",   label:"Umbral de compra · kW",           type:"number", value:2, min:0, max:100000, step:0.1 },
+      { id:"candidate1",  label:"Batería alternativa 1 · kWh útiles", type:"number", value:10, min:0, max:100000, step:0.1 },
+      { id:"candidate2",  label:"Batería alternativa 2 · kWh útiles", type:"number", value:15, min:0, max:100000, step:0.1 }
+    ]
+  },
+  {
+    title: "💶 Tarifas y economía",
+    fields: [
+      { id:"dayPrice",      label:"Compra diurna · €/kWh",   type:"number", value:0.24, min:0, max:10, step:0.001 },
+      { id:"nightPrice",    label:"Compra nocturna · €/kWh", type:"number", value:0.14, min:0, max:10, step:0.001 },
+      { id:"exportPrice",   label:"Valor de excedentes · €/kWh", type:"number", value:0.06, min:0, max:10, step:0.001 },
+      { id:"exportMode",    label:"Tratamiento de excedentes", type:"select", value:"compensation",
+        options:[["compensation","Compensación mensual aproximada"],["sale","Venta con precio fijo"],["none","Sin remuneración"]] },
+      { id:"pvCapex",       label:"Inversión FV sin batería · €", type:"number", value:7000, min:0, max:100000000, step:1 },
+      { id:"batteryCost",   label:"Coste batería inicial · €/kWh útil", type:"number", value:500, min:0, max:100000, step:1 },
+      { id:"batteryLife",   label:"Vida útil prevista batería · años", type:"number", value:15, min:0, max:50, step:1 },
+      { id:"batteryReplaceCost", label:"Coste reposición batería · €/kWh útil", type:"number", value:350, min:0, max:100000, step:1 },
+      { id:"opex",          label:"Mantenimiento anual · €",  type:"number", value:100, min:0, max:10000000, step:1 },
+      { id:"opexEscalation",label:"Escalado anual OPEX · %",  type:"number", value:2, min:0, max:20, step:0.1 },
+      { id:"priceEscalation",label:"Escalado anual precio luz · %", type:"number", value:2.5, min:0, max:20, step:0.1 },
+      { id:"discount",      label:"Tasa de descuento · %",    type:"number", value:5, min:0, max:50, step:0.1 },
+      { id:"degradation",   label:"Degradación anual FV · %", type:"number", value:0.5, min:0, max:10, step:0.1 },
+      { id:"years",         label:"Horizonte económico · años", type:"number", value:25, min:1, max:50, step:1 }
+    ]
+  },
+  {
+    title: "🔌 Cableado y geometría",
+    fields: [
+      { id:"dcLength",       label:"Longitud DC por sentido · m", type:"number", value:20, min:0.1, max:10000, step:0.1 },
+      { id:"acLength",       label:"Longitud AC por sentido · m", type:"number", value:15, min:0.1, max:10000, step:0.1 },
+      { id:"acSystem",       label:"Sistema AC orientativo", type:"select", value:"single",
+        options:[["single","Monofásico"],["three","Trifásico equilibrado"]] },
+      { id:"acVoltage",      label:"Tensión AC · V", type:"number", value:230, min:50, max:1000, step:1 },
+      { id:"dropDC",         label:"Caída máxima DC · %", type:"number", value:1.5, min:0.1, max:10, step:0.1 },
+      { id:"dropAC",         label:"Caída máxima AC · %", type:"number", value:1.5, min:0.1, max:10, step:0.1 },
+      { id:"designElevation",label:"Altura solar de diseño · grados", type:"number", value:20, min:1, max:89, step:1 },
+      { id:"modulesPerRow",  label:"Módulos por fila en DXF", type:"number", value:4, min:1, max:1000, step:1 }
+    ]
+  }
+];
+
+/* ========================= 3. UTILIDADES ================================= */
+
+const $ = id => document.getElementById(id);
+const sum = arr => arr.reduce((a,b)=>a+b, 0);
+const rad = deg => deg * Math.PI / 180;
+const clamp = (v,lo,hi) => Math.min(hi, Math.max(lo, v));
+
+/** Formatea un número en locale español; devuelve "—" si no es finito. */
+function num(v, d = 0){
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString("es-ES", { minimumFractionDigits:d, maximumFractionDigits:d });
+}
+/** Formatea en euros. */
+const eur = (v,d=0) => Number.isFinite(Number(v)) ? num(v,d) + " €" : "—";
+/** Formatea con punto decimal (para DXF y CSV técnicos). */
+const dot = (v,d=4) => Number.isFinite(Number(v)) ? Number(v).toFixed(d) : "0.0000";
+
+function escapeHTML(str){
+  return String(str)
+    .replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+/** Muestra un mensaje en el panel del formulario. */
+function status(type, html){
+  return `<div class="status ${type}">${html}</div>`;
+}
+function setMessage(text, type = "ok"){
+  const el = $("formMessage");
+  el.textContent = text;
+  el.className = "msg show " + type;
+  if (type === "ok") setTimeout(() => { el.className = "msg"; }, 6000);
+}
+
+/** Dispara la descarga de un fichero de texto. */
+function download(filename, content, mime = "text/plain;charset=utf-8"){
+  const blob = new Blob(["\uFEFF" + content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+/* ====================== 4. IMPORTADORES DE FICHEROS ====================== */
+
+/** Divide un CSV en filas y celdas, tolerando ; y , como separador. */
+function parseCSV(text){
+  return text.replace(/^\uFEFF/, "")
+    .split(/\r?\n/)
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    .map(l => l.split(/[;,]/).map(c => c.trim()));
+}
+
+/** Convierte un texto numérico tolerando coma decimal. */
+function toNumber(raw){
+  return Number(String(raw).replace(",", "."));
+}
+
+/** Curva de consumo: una columna kWh con 8.760 valores. */
+function parseLoadCSV(text){
+  const rows = parseCSV(text);
+  if (!rows.length) throw new Error("El CSV está vacío.");
+  const header = rows[0].map(h => h.toLowerCase());
+  const kIdx = header.findIndex(h => h.includes("kwh"));
+  const col = kIdx >= 0 ? kIdx : 0;
+  const data = kIdx >= 0 ? rows.slice(1) : rows;
+  const values = data.map(r => toNumber(r[col]));
+  if (values.length !== HOURS)
+    throw new Error(`Se esperaban ${HOURS} valores horarios y se han encontrado ${values.length}.`);
+  if (values.some(v => !Number.isFinite(v) || v < 0))
+    throw new Error("El CSV contiene valores no numéricos o negativos.");
+  return values;
+}
+
+/** Producción PVGIS: outputs.hourly con campo P (W). */
+function parseSolarJSON(text){
+  let data;
+  try { data = JSON.parse(text); }
+  catch { throw new Error("El JSON no es válido."); }
+
+  const hourly = data?.outputs?.hourly;
+  if (!Array.isArray(hourly) || !hourly.length)
+    throw new Error("No se encuentra outputs.hourly en el JSON.");
+
+  let values;
+  if (typeof hourly[0] === "object" && !Array.isArray(hourly[0])){
+    values = hourly.map(h => Number(h.P));
+  } else {
+    const hdr = data?.outputs?.hourly_header || [];
+    const pIdx = hdr.findIndex(h => String(h).trim().toUpperCase() === "P");
+    const idx = pIdx >= 0 ? pIdx : 1;
+    values = hourly.map(r => Number(r[idx]));
+  }
+
+  // PVGIS puede devolver 8.784 valores en año bisiesto: se elimina el 29 de febrero.
+  if (values.length === 8784) values.splice(1416, 24);
+  if (values.length !== HOURS)
+    throw new Error(`Se esperaban ${HOURS} valores horarios y se han encontrado ${values.length}.`);
+  if (values.some(v => !Number.isFinite(v) || v < 0))
+    throw new Error("El JSON contiene valores de producción no válidos.");
+
+  const peak = Number(data?.inputs?.peakpower ?? data?.inputs?.pv_peak ?? 0) || null;
+  return { values, peak };
+}
+
+/** Precios horarios: dos columnas compra;excedente. */
+function parseTariffCSV(text){
+  const rows = parseCSV(text);
+  if (!rows.length) throw new Error("El CSV está vacío.");
+  const header = rows[0].map(h => h.toLowerCase());
+  const hasHeader = header.some(h => h.includes("compra") || h.includes("excedente") || h.includes("buy"));
+  const data = hasHeader ? rows.slice(1) : rows;
+  if (data.length !== HOURS)
+    throw new Error(`Se esperaban ${HOURS} filas de precios y se han encontrado ${data.length}.`);
+  const buy = [], sell = [];
+  for (const r of data){
+    const b = toNumber(r[0]);
+    const s = r.length > 1 ? toNumber(r[1]) : 0;
+    if (!Number.isFinite(b) || !Number.isFinite(s))
+      throw new Error("El CSV de precios contiene valores no numéricos.");
+    buy.push(Math.max(0, b));
+    sell.push(Math.max(0, s));
+  }
+  return { buy, sell };
+}
+
+/* ======================== 5. MOTOR SOLAR ================================= */
+
+/** Pesos horarios de consumo según perfil de uso. */
+function profileWeights(profile){
+  const profiles = {
+    residential:[0.6,0.5,0.5,0.5,0.6,0.8,1.2,1.5,1.1,0.8,0.7,0.7,0.8,0.8,0.8,0.8,0.9,1.2,1.7,2.1,2.2,1.9,1.4,0.9],
+    commercial: [0.2,0.2,0.2,0.2,0.2,0.3,0.5,0.9,1.5,1.8,2.0,2.1,2.1,2.0,2.0,2.0,1.9,1.6,1.2,0.8,0.5,0.3,0.2,0.2],
+    industrial: [0.7,0.7,0.7,0.7,0.8,0.9,1.1,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.2,1.1,1.0,0.9,0.8,0.8,0.7]
+  };
+  const vals = profiles[profile] || profiles.residential;
+  const t = sum(vals);
+  return vals.map(v => v / t);
+}
+
+/**
+ * Vector solar y elevación para un instante dado.
+ * Devuelve componentes en el sistema (arriba, este, norte).
+ */
+function solarVector(dayOfYear, hour, latitude){
+  const lat = rad(latitude);
+  const dec = rad(23.45 * Math.sin(2 * Math.PI * (284 + dayOfYear) / 365));
+  const ha  = rad(15 * (hour + 0.5 - 12));
+  const up    = Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(ha);
+  const east  = -Math.cos(dec) * Math.sin(ha);
+  const north = Math.cos(lat)*Math.sin(dec) - Math.sin(lat)*Math.cos(dec)*Math.cos(ha);
+  return { up, east, north, elevDeg: Math.asin(clamp(up,-1,1)) * 180 / Math.PI };
+}
+
+/**
+ * Irradiancia de cielo claro en horizontal (forma relativa).
+ * Masa de aire Kasten-Young + atenuación tipo Meinel.
+ */
+function clearSkyShape(elevDeg, dayOfYear){
+  if (elevDeg <= 0) return 0;
+  const sinE = Math.sin(rad(elevDeg));
+  const I0 = 1367 * (1 + 0.033 * Math.cos(2 * Math.PI * dayOfYear / 365));
+  const am = 1 / (sinE + 0.50572 * Math.pow(elevDeg + 6.07995, -1.6364));
+  const dni = I0 * Math.pow(0.7, Math.pow(am, 0.678));
+  return Math.max(0, dni * sinE * 1.10);
+}
+
+/** Fracción difusa según correlación de Erbs a partir del índice de claridad. */
+function erbsDiffuseFraction(kt){
+  if (kt <= 0.22) return 1 - 0.09 * kt;
+  if (kt <= 0.80) return 0.9511 - 0.1604*kt + 4.388*kt*kt - 16.638*kt**3 + 12.336*kt**4;
+  return 0.165;
+}
+
+/**
+ * Construye las series horarias de demanda y producción.
+ * Devuelve también los precios horarios y la temperatura ambiente mensual.
+ */
+function makeEnergySeries(p){
+  const load = new Array(HOURS), solar = new Array(HOURS);
+  const pvDc = new Array(HOURS), clipped = new Array(HOURS);
+  const months = new Array(HOURS);
+  const buy = new Array(HOURS), sell = new Array(HOURS);
+
+  const weights = profileWeights(p.profile);
+  const tilt = rad(p.tilt), azim = rad(p.azimuth);
+  const nEast  = Math.sin(tilt) * Math.sin(azim);
+  const nNorth = Math.sin(tilt) * Math.cos(azim);
+  const nUp    = Math.cos(tilt);
+  const pvKWp  = p.modules * p.moduleW / 1000;
+
+  // Temperatura ambiente mensual estimada (sinusoide centrada en julio).
+  const tamb = MONTHS.map((_, m) => p.tambAvg + p.tambAmp * Math.cos(2 * Math.PI * (m - 6.5) / 12));
+
+  let index = 0, dayOfYear = 0;
+
+  for (let m = 0; m < 12; m++){
+    for (let d = 0; d < DAYS[m]; d++){
+      dayOfYear++;
+
+      // 1) Geometría y forma de cielo claro del día completo.
+      const geo = new Array(24), shape = new Array(24);
+      let shapeSum = 0;
+      for (let h = 0; h < 24; h++){
+        geo[h] = solarVector(dayOfYear, h, p.lat);
+        shape[h] = clearSkyShape(geo[h].elevDeg, dayOfYear);
+        shapeSum += shape[h];
+      }
+
+      for (let h = 0; h < 24; h++){
+        // 2) Demanda horaria.
+        const base = importedLoad ? importedLoad[index] : p.dailyLoad * weights[h];
+        const ev   = h >= 20 ? p.evDaily / 4 : 0;
+        const heat = [6,7,8,18,19,20].includes(h) ? p.heatDaily / 6 : 0;
+        load[index] = base + ev + heat;
+        months[index] = m;
+
+        // 3) Producción fotovoltaica.
+        let pvAc = 0, dc = 0, clip = 0;
+        if (importedSolar){
+          const scale = pvKWp / (importedSolar.peak || p.pvgisPeak || pvKWp);
+          pvAc = importedSolar.values[index] / 1000 * scale;
+          dc = pvAc;
+        } else {
+          const g = geo[h];
+          // GHI horaria: reparto del GHI diario según la forma de cielo claro.
+          const ghi = shapeSum > 0 ? p.ghi[m] * shape[h] / shapeSum : 0;
+          if (ghi > 0 && g.up > 0.02){
+            const sinE = Math.sin(rad(g.elevDeg));
+            const I0 = 1367 * (1 + 0.033 * Math.cos(2 * Math.PI * dayOfYear / 365));
+            const kt = clamp(ghi / Math.max(1e-6, I0 * sinE), 0, 1);
+            const fd = erbsDiffuseFraction(kt);
+            const dhi = ghi * fd;
+            const dni = (ghi - dhi) / Math.max(1e-6, sinE);
+
+            const cosInc = Math.max(0, g.east*nEast + g.north*nNorth + g.up*nUp);
+            const poaBeam = dni * cosInc * (1 - p.shade / 100);
+            const poaDiff = dhi * (1 + Math.cos(tilt)) / 2;
+            const poaRef  = ghi * p.albedo * (1 - Math.cos(tilt)) / 2;
+            const poa = Math.max(0, poaBeam + poaDiff + poaRef);   // kW/m²
+
+            // 4) Temperatura de célula (NOCT) y factor térmico.
+            const tCell = tamb[m] + (p.noct - 20) * poa * 1.25;
+            const tempFactor = Math.max(0, 1 + p.powerCoeff / 100 * (tCell - 25));
+
+            dc = pvKWp * poa * tempFactor * (1 - p.systemLoss / 100);
+            const acRaw = dc * p.invEfficiency / 100;
+            pvAc = Math.min(p.inverterKW, acRaw);
+            clip = Math.max(0, acRaw - p.inverterKW);
+          }
+        }
+        solar[index] = pvAc;
+        pvDc[index] = dc;
+        clipped[index] = clip;
+
+        // 5) Precios horarios.
+        if (importedTariff){
+          buy[index] = importedTariff.buy[index];
+          sell[index] = importedTariff.sell[index];
+        } else {
+          buy[index] = (h >= 8 && h < 23) ? p.dayPrice : p.nightPrice;
+          sell[index] = p.exportPrice;
+        }
+        index++;
+      }
+    }
+  }
+  return { load, solar, pvDc, clipped, months, buy, sell, tamb };
+}
+
+/* ==================== 6. SIMULACIÓN HORARIA ============================== */
+
+/**
+ * Simula el año completo para una capacidad de batería dada.
+ * Contabiliza el balance de SOC para que las pérdidas sean coherentes.
+ */
+function simulate(p, series, capacity, keepHourly){
+  const monthly = Array.from({ length:12 }, () => ({
+    pv:0, load:0, grid:0, export:0, direct:0, batteryIn:0, batteryOut:0,
+    baselineCost:0, purchaseCost:0, exportCredit:0, actualCost:0
+  }));
+  const hourly = keepHourly ? [] : null;
+  const eta = Math.sqrt(p.batteryEff / 100);
+  let soc = capacity * 0.5;
+  const initialSoc = soc;
+  let peakLoad = 0, peakGrid = 0;
+
+  for (let i = 0; i < HOURS; i++){
+    const m = series.months[i], h = i % 24;
+    const pv = series.solar[i], l = series.load[i];
+    const direct = Math.min(l, pv);
+    let surplus = Math.max(0, pv - direct);
+    let remLoad = Math.max(0, l - direct);
+    let bIn = 0, bOut = 0;
+
+    if (surplus > 0 && capacity > 0 && p.batteryKW > 0){
+      bIn = Math.min(surplus, p.batteryKW, Math.max(0, capacity - soc) / eta);
+      soc += bIn * eta;
+      surplus -= bIn;
+    }
+    if (remLoad > 0 && capacity > 0 && p.batteryKW > 0){
+      const req = p.strategy === "peak" ? Math.max(0, remLoad - p.peakLimit) : remLoad;
+      bOut = Math.min(req, p.batteryKW, soc * eta);
+      soc -= bOut / eta;
+      remLoad -= bOut;
+    }
+
+    const price = series.buy[i];
+    const row = monthly[m];
+    row.pv += pv; row.load += l; row.grid += remLoad; row.export += surplus;
+    row.direct += direct; row.batteryIn += bIn; row.batteryOut += bOut;
+    row.baselineCost += l * price;
+    row.purchaseCost += remLoad * price;
+    peakLoad = Math.max(peakLoad, l);
+    peakGrid = Math.max(peakGrid, remLoad);
+
+    if (hourly){
+      hourly.push({ index:i+1, month:m+1, hour:h, load:l, pv, direct,
+                    batteryIn:bIn, batteryOut:bOut, grid:remLoad, export:surplus, soc });
+    }
+  }
+
+  // Compensación de excedentes mes a mes.
+  for (const m of monthly){
+    const cred = m.export * p.exportPrice;
+    m.exportCredit = p.exportMode === "compensation" ? Math.min(cred, m.purchaseCost)
+                   : p.exportMode === "sale" ? cred : 0;
+    m.actualCost = m.purchaseCost - m.exportCredit;
+  }
+
+  const total = {};
+  for (const k of Object.keys(monthly[0])) total[k] = sum(monthly.map(r => r[k]));
+
+  total.grossSaving = total.baselineCost - total.actualCost;
+  total.netSaving = total.grossSaving - p.opex;
+  total.selfSufficiency = total.load > 0 ? (total.direct + total.batteryOut) / total.load * 100 : 0;
+  total.selfConsumption  = total.pv   > 0 ? (total.pv - total.export) / total.pv * 100 : 0;
+  // Pérdidas reales: energía que entra menos la que sale, ajustada por la deriva de SOC.
+  total.batteryLoss = total.batteryIn - total.batteryOut - (soc - initialSoc);
+  total.clipped = sum(series.clipped);
+  total.pvDc = sum(series.pvDc);
+
+  return { capacity, monthly, hourly, total, initialSoc, finalSoc:soc, peakLoad, peakGrid };
+}
+/* ==================== 7. ANÁLISIS TÉCNICO Y CABLEADO ===================== */
+
+/** Comprobaciones eléctricas completas de tensiones y corrientes. */
+function technicalAnalysis(p){
+  const perString   = p.modules / p.strings;
+  const vocCold     = perString * p.voc  * (1 + p.vocCoeff  / 100 * (p.tmin     - 25));
+  const vmppHot     = perString * p.vmpp * (1 + p.vmppCoeff / 100 * (p.tcellmax - 25));
+  const vmppCold    = perString * p.vmpp * (1 + p.vmppCoeff / 100 * (p.tmin     - 25));
+  const iscCold     = p.isc  * p.parallelStrings * (1 + ISC_TEMP_COEFF / 100 * (25 - p.tmin));
+  const imppTotal   = p.impp * p.parallelStrings;
+  const pvKWp       = p.modules * p.moduleW / 1000;
+  const dcAcRatio   = p.inverterKW > 0 ? pvKWp / p.inverterKW : 0;
+  const acCurrent   = p.acSystem === "three"
+    ? p.inverterKW * 1000 / (Math.sqrt(3) * p.acVoltage)
+    : p.inverterKW * 1000 / p.acVoltage;
+
+  return { perString, vocCold, vmppHot, vmppCold, iscCold, imppTotal,
+           pvKWp, dcAcRatio, acCurrent };
+}
+
+/** Selecciona la sección comercial inmediatamente superior. */
+function pickSection(minSection){
+  for (const s of CU_SECTIONS) if (s >= minSection) return s;
+  return null;
+}
+
+/** Dimensionado de cable por caída de tensión y comprobación de ampacidad. */
+function cableSizing(p, tech){
+  const iDc = tech.imppTotal;
+  const vDc = Math.max(1, tech.vmppHot);
+  const sDcMin = 2 * CU_RHO * p.dcLength * iDc / (p.dropDC / 100 * vDc);
+
+  const iAc = tech.acCurrent;
+  const sAcMin = p.acSystem === "three"
+    ? Math.sqrt(3) * CU_RHO * p.acLength * iAc / (p.dropAC / 100 * p.acVoltage)
+    : 2 * CU_RHO * p.acLength * iAc / (p.dropAC / 100 * p.acVoltage);
+
+  const dcSec = pickSection(sDcMin);
+  const acSec = pickSection(sAcMin);
+  const dcAmp = dcSec ? CU_AMPACITY[dcSec] : null;
+  const acAmp = acSec ? CU_AMPACITY[acSec] : null;
+
+  return {
+    iDc, iAc, sDcMin, sAcMin, dcSec, acSec, dcAmp, acAmp,
+    dcAmpOk: dcAmp !== null && iDc <= dcAmp,
+    acAmpOk: acAmp !== null && iAc <= acAmp,
+    dcLengthTotal: p.dcLength * 2,
+    acLengthTotal: p.acLength * 2
+  };
+}
+
+/* ========================= 8. ECONOMÍA =================================== */
+
+/** Tasa interna de retorno por bisección sobre el VAN. */
+function irr(cashflows){
+  const npv = r => cashflows.reduce((a, c, t) => a + c / Math.pow(1 + r, t), 0);
+  let lo = -0.9, hi = 1.5;
+  if (npv(lo) * npv(hi) > 0) return null;
+  for (let i = 0; i < 200; i++){
+    const mid = (lo + hi) / 2;
+    if (npv(lo) * npv(mid) <= 0) hi = mid; else lo = mid;
+  }
+  return (lo + hi) / 2;
+}
+
+/**
+ * Modelo económico completo: flujos anuales, VAN, TIR, payback y LCOE.
+ * La degradación FV reduce la producción y, con ella, el ahorro.
+ */
+function economics(p, sim){
+  const capex = p.pvCapex + p.battery * p.batteryCost;
+  const years = Math.max(1, Math.round(p.years));
+  const r = p.discount / 100;
+  const d = p.degradation / 100;
+  const eEsc = p.priceEscalation / 100;
+  const oEsc = p.opexEscalation / 100;
+  const battLife = Math.max(0, Math.round(p.batteryLife));
+
+  const flows = [-capex];
+  const rows = [];
+  let van = -capex, vanPrev = -capex;
+  let cum = -capex, cumPrev = -capex;
+  let payback = null, discountedPayback = null;
+  let lcoeNum = capex, lcoeDen = 0;
+  const prod0 = sim.total.pv;
+
+  for (let t = 1; t <= years; t++){
+    const prod = prod0 * Math.pow(1 - d, t - 1);
+    const saving = sim.total.grossSaving * Math.pow(1 - d, t - 1) * Math.pow(1 + eEsc, t - 1);
+    const opex = p.opex * Math.pow(1 + oEsc, t - 1);
+    const replace = (p.battery > 0 && battLife > 0 && t % battLife === 0 && t < years)
+      ? p.batteryReplaceCost * p.battery : 0;
+
+    const net = saving - opex - replace;
+    const disc = net / Math.pow(1 + r, t);
+
+    vanPrev = van; van += disc;
+    cumPrev = cum; cum += net;
+
+    if (payback === null && cum >= 0 && net > 0) payback = (t - 1) + (-cumPrev) / net;
+    if (discountedPayback === null && van >= 0 && disc > 0) discountedPayback = (t - 1) + (-vanPrev) / disc;
+
+    lcoeNum += (opex + replace) / Math.pow(1 + r, t);
+    lcoeDen += prod / Math.pow(1 + r, t);
+
+    flows.push(net);
+    rows.push({ year:t, prod, saving, opex, replace, net, disc, cum, van });
+  }
+
+  const lcoe = lcoeDen > 0 ? lcoeNum / lcoeDen : null;
+  const tir = irr(flows);
+
+  // Vida estimada de la batería a partir del ciclado real.
+  const tech = BATTERY_TECH[p.batteryType] || BATTERY_TECH.other;
+  const annualThroughput = sim.total.batteryOut;
+  const equivalentCycles = p.battery > 0 ? annualThroughput / p.battery : 0;
+  const estimatedLife = equivalentCycles > 0 ? tech.cycles / equivalentCycles : null;
+
+  return { capex, van, tir, payback, discountedPayback, lcoe, rows, flows,
+           equivalentCycles, estimatedLife, tech };
+}
+
+/* ==================== 9. VALIDACIÓN DE ENTRADAS ========================== */
+
+function validateInputs(p){
+  const errors = [], warnings = [];
+
+  if (p.ghi.length !== 12 || p.ghi.some(v => !Number.isFinite(v) || v < 0 || v > 15))
+    errors.push("Introduce 12 valores GHI válidos entre 0 y 15 kWh/m²/día.");
+
+  if (!Number.isInteger(p.modules / p.strings))
+    errors.push("El número de módulos debe ser divisible por el número de strings.");
+
+  if (p.mpptMin >= p.mpptMax)
+    errors.push("El límite inferior del MPPT debe ser menor que el superior.");
+
+  if (p.inverterKW <= 0)
+    errors.push("La potencia del inversor debe ser mayor que cero.");
+
+  if (p.battery > 0 && p.batteryKW <= 0)
+    warnings.push("Has definido batería pero la potencia de carga/descarga es cero: no se usará.");
+
+  if (p.strategy === "peak" && p.peakLimit <= 0)
+    errors.push("Con estrategia de limitación de compra, el umbral debe ser mayor que cero.");
+
+  if (p.tmin >= p.tcellmax)
+    warnings.push("La temperatura mínima de diseño es mayor o igual que la máxima de célula.");
+
+  if (p.batteryEff < 70 && p.battery > 0)
+    warnings.push("Un rendimiento de ciclo inferior al 70 % es poco habitual en baterías modernas.");
+
+  return { errors, warnings };
+}
+
+/* ======================== 10. RENDERIZADO ================================ */
+
+let monthlyChart = null, batteryChart = null, cashflowChart = null;
+let chartsAvailable = false;
+
+// Cada métrica lleva su propia trazabilidad embebida.
+function metric(title, value, note, cls = "", trace = null){
+  const detail = trace
+    ? `<details class="metric-trace"><summary>ver cálculo</summary>
+         <pre>${escapeHTML(trace.formula)}\n${escapeHTML(trace.substitution)}</pre></details>`
+    : "";
+  return `<div class="metric ${cls}"><span>${escapeHTML(title)}</span>
+          <strong>${value}</strong><em>${escapeHTML(note)}</em>${detail}</div>`;
+}
+
+function render(result){
+  const p = result.input;
+  const t = result.selected.total;
+  const tech = result.technical;
+  const eco = result.economics;
+
+  $("projectSummary").textContent =
+    `${p.name} · ${num(tech.pvKWp, 2)} kWp · ${p.modules} módulos de ${p.moduleW} Wp · ` +
+    `Inversor ${num(p.inverterKW, 1)} kW AC · Batería ${num(p.battery, 1)} kWh útiles`;
+
+  const paybackTxt = eco.payback !== null ? `${num(eco.payback, 1)} años` : "> horizonte";
+  const vanCls = eco.van >= 0 ? "good" : "bad";
+
+  // --- Métricas principales, con traza de cálculo embebida (modo auditoría) ---
+  $("metrics").innerHTML = [
+    metric("Producción FV", `${num(t.pv)} kWh/año`, "Salida AC estimada", "", {
+      formula: "E_AC = Σ(h=1..8760) P_ac,h",
+      substitution: `Σ de las 8.760 horas = ${num(t.pv, 1)} kWh/año`
+    }),
+    metric("Demanda total", `${num(t.load)} kWh/año`, "Incluye cargas añadidas", "", {
+      formula: "E_load = Σ(h=1..8760) L_h",
+      substitution: `Σ de las 8.760 horas = ${num(t.load, 1)} kWh/año`
+    }),
+    metric("Autonomía", `${num(t.selfSufficiency, 1)} %`, "Cubierta por FV + batería", "", {
+      formula: "Autonomía = (E_directa + E_batería) / E_demanda × 100",
+      substitution: `(${num(t.direct, 1)} + ${num(t.batteryOut, 1)}) / ${num(t.load, 1)} × 100 = ${num(t.selfSufficiency, 1)} %`
+    }),
+    metric("Autoconsumo", `${num(t.selfConsumption, 1)} %`, "FV no exportada", "", {
+      formula: "Autoconsumo = (E_FV − E_excedente) / E_FV × 100",
+      substitution: `(${num(t.pv, 1)} − ${num(t.export, 1)}) / ${num(t.pv, 1)} × 100 = ${num(t.selfConsumption, 1)} %`
+    }),
+    metric("Ahorro bruto", eur(t.grossSaving), "Primer año, antes de OPEX", "", {
+      formula: "Ahorro = Coste_base − Coste_real",
+      substitution: `${eur(t.baselineCost, 2)} − ${eur(t.actualCost, 2)} = ${eur(t.grossSaving, 2)}`
+    }),
+    metric("VAN", eur(eco.van), `${num(p.years)} años al ${num(p.discount, 1)} %`, vanCls, {
+      formula: "VAN = Σ(t=1..N) F_t / (1+r)^t − CAPEX",
+      substitution: `Σ de ${num(p.years)} flujos anuales al ${num(p.discount, 1)} % − ${eur(eco.capex)} = ${eur(eco.van, 2)}`
+    }),
+    metric("Payback", paybackTxt, "Retorno simple", "", {
+      formula: "Payback = (t − 1) + (−Flujo_acum_{t−1}) / Flujo_t",
+      substitution: eco.payback !== null
+        ? `Interpolado en el año ${num(Math.floor(eco.payback), 0)} = ${num(eco.payback, 2)} años`
+        : "La inversión no se recupera dentro del horizonte."
+    }),
+    metric("LCOE", eco.lcoe !== null ? `${num(eco.lcoe * 100, 2)} c€/kWh` : "—", "Coste nivelado", "", {
+      formula: "LCOE = (CAPEX + Σ OPEX_t/(1+r)^t) / Σ E_t/(1+r)^t",
+      substitution: eco.lcoe !== null
+        ? `Costes descontados / energía descontada = ${num(eco.lcoe * 100, 2)} c€/kWh`
+        : "Sin producción anual: no calculable."
+    })
+  ].join("");
+
+  // --- Procedencia de los datos ---
+  const conf = confidenceLevel();
+  const confCls = conf.level === "Alta" ? "ok" : conf.level === "Media" ? "warn" : "";
+  $("provenance").innerHTML = `
+    <div class="kpi-inline">
+      <div><span class="badge ${confCls}">Confianza ${escapeHTML(conf.level)}</span></div>
+    </div>
+    <p class="card-sub" style="margin-top:10px">${escapeHTML(conf.note)}</p>
+    <ul class="hypotheses" style="margin-top:6px">
+      <li>Curva de consumo: <strong>${importedLoad ? "CSV aportado por el usuario" : "perfil sintético por uso"}</strong></li>
+      <li>Producción solar: <strong>${importedSolar ? "datos PVGIS aportados" : "modelo solar analítico"}</strong></li>
+      <li>Precios horarios: <strong>${importedTariff ? "CSV aportado por el usuario" : "tarifa simplificada de dos precios"}</strong></li>
+    </ul>`;
+
+  // --- Tabla mensual ---
+  $("monthRows").innerHTML = result.selected.monthly.map((m, i) => `
+    <tr>
+      <td>${MONTHS[i]}</td>
+      <td>${num(m.pv)}</td><td>${num(m.load)}</td><td>${num(m.direct)}</td>
+      <td>${num(m.batteryOut)}</td><td>${num(m.grid)}</td><td>${num(m.export)}</td>
+    </tr>`).join("");
+  $("monthFoot").innerHTML = `
+    <tr>
+      <td>Total</td>
+      <td>${num(t.pv)}</td><td>${num(t.load)}</td><td>${num(t.direct)}</td>
+      <td>${num(t.batteryOut)}</td><td>${num(t.grid)}</td><td>${num(t.export)}</td>
+    </tr>`;
+
+  // --- Escenarios de batería ---
+  $("scenarioRows").innerHTML = result.scenarios.map(s => {
+    const e = s.economics;
+    const pb = e.payback !== null ? `${num(e.payback, 1)} a` : "—";
+    const isCurrent = s.capacity === p.battery;
+    return `<tr>
+      <td>${num(s.capacity, 1)} kWh${isCurrent ? ' <span class="badge gold">actual</span>' : ""}</td>
+      <td>${num(s.total.grid)}</td>
+      <td>${num(s.total.export)}</td>
+      <td>${num(s.total.selfSufficiency, 1)} %</td>
+      <td>${eur(s.total.grossSaving)}</td>
+      <td>${eur(e.van)}</td>
+      <td>${pb}</td>
+    </tr>`;
+  }).join("");
+
+  // --- Comprobaciones técnicas ---
+  const checks = [];
+  checks.push(status(tech.vocCold <= p.invMaxV ? "ok" : "bad",
+    `Voc en frío por string: <strong>${num(tech.vocCold,1)} V</strong> · límite del inversor ${num(p.invMaxV)} V`));
+  checks.push(status(tech.vocCold <= p.mpptMax ? "ok" : "warn",
+    `Voc en frío frente al límite superior MPPT (${num(p.mpptMax)} V): <strong>${tech.vocCold <= p.mpptMax ? "dentro" : "excedido"}</strong>`));
+  checks.push(status(tech.vmppHot >= p.mpptMin ? "ok" : "bad",
+    `Vmpp en caliente por string: <strong>${num(tech.vmppHot,1)} V</strong> · mínimo MPPT ${num(p.mpptMin)} V`));
+  checks.push(status(tech.vmppHot <= p.mpptMax ? "ok" : "bad",
+    `Vmpp en caliente frente al máximo MPPT (${num(p.mpptMax)} V): <strong>${tech.vmppHot <= p.mpptMax ? "dentro" : "excedido"}</strong>`));
+  checks.push(status(tech.iscCold <= p.mpptMaxIsc ? "ok" : "bad",
+    `Isc en frío (${num(p.parallelStrings)} strings en paralelo): <strong>${num(tech.iscCold,1)} A</strong> · máximo admisible ${num(p.mpptMaxIsc,1)} A`));
+  checks.push(status(tech.imppTotal <= p.mpptMaxI ? "ok" : "bad",
+    `Impp total por MPPT: <strong>${num(tech.imppTotal,1)} A</strong> · máximo ${num(p.mpptMaxI,1)} A`));
+
+  const ratioDev = p.dcAcTarget > 0 ? Math.abs(tech.dcAcRatio - p.dcAcTarget) / p.dcAcTarget : 0;
+  checks.push(status(ratioDev <= 0.15 ? "ok" : "warn",
+    `Relación DC/AC: <strong>${num(tech.dcAcRatio,2)}</strong> · objetivo ${num(p.dcAcTarget,2)}`));
+
+  if (t.clipped > 0.01 * t.pv && t.clipped > 1){
+    checks.push(status("warn",
+      `Recorte por límite de inversor: <strong>${num(t.clipped)} kWh/año</strong> (${num(t.clipped / t.pvDc * 100, 2)} % de la producción DC).`));
+  }
+  checks.push(status("info",
+    `Intensidad nominal AC del inversor: <strong>${num(tech.acCurrent,1)} A</strong>. Verifica protecciones y cableado.`));
+
+  $("technical").innerHTML = checks.join("");
+
+  // --- Cableado ---
+  const cab = result.cabling;
+  const dcSecTxt = cab.dcSec ? `${cab.dcSec} mm²` : "fuera de tabla";
+  const acSecTxt = cab.acSec ? `${cab.acSec} mm²` : "fuera de tabla";
+  $("cabling").innerHTML = `
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Circuito</th><th>Intensidad</th><th>Sección mínima</th><th>Sección comercial</th><th>Ampacidad</th><th>Longitud total</th></tr></thead>
+        <tbody>
+          <tr><td>DC (strings → inversor)</td><td>${num(cab.iDc,1)} A</td><td>${num(cab.sDcMin,2)} mm²</td>
+              <td>${dcSecTxt}</td><td>${cab.dcAmp ? num(cab.dcAmp,0) + " A" : "—"}</td><td>${num(cab.dcLengthTotal,1)} m</td></tr>
+          <tr><td>AC (inversor → cuadro)</td><td>${num(cab.iAc,1)} A</td><td>${num(cab.sAcMin,2)} mm²</td>
+              <td>${acSecTxt}</td><td>${cab.acAmp ? num(cab.acAmp,0) + " A" : "—"}</td><td>${num(cab.acLengthTotal,1)} m</td></tr>
+        </tbody>
+      </table>
+    </div>
+    ${status(cab.dcAmpOk ? "ok" : "warn", cab.dcAmpOk
+      ? "Ampacidad DC suficiente con la sección comercial seleccionada."
+      : "La sección por caída de tensión podría no cubrir la ampacidad: revisa el método de instalación.")}
+    ${status(cab.acAmpOk ? "ok" : "warn", cab.acAmpOk
+      ? "Ampacidad AC suficiente con la sección comercial seleccionada."
+      : "La sección AC por caída de tensión podría no cubrir la ampacidad: revisa el método de instalación.")}
+    <p class="card-sub" style="margin-top:10px">Cálculo orientativo con cobre a 0,0225 Ω·mm²/m y ampacidad tipo B1 (2 conductores, 30 °C). No sustituye el cálculo reglamentario.</p>`;
+
+  // --- Economía ---
+  const lifeNote = eco.estimatedLife !== null
+    ? `Ciclado equivalente: ${num(eco.equivalentCycles,0)} ciclos/año · vida estimada ${num(eco.estimatedLife,1)} años (${eco.tech.label}, ${num(eco.tech.cycles)} ciclos).`
+    : "Sin batería configurada: no se estima ciclado.";
+
+  $("finance").innerHTML = `
+    <div class="metrics">
+      ${metric("CAPEX", eur(eco.capex), "Inversión inicial", "", {
+        formula: "CAPEX = Inversión_FV + Batería × Coste_batería",
+        substitution: `${eur(p.pvCapex)} + ${num(p.battery,1)} kWh × ${eur(p.batteryCost)} = ${eur(eco.capex)}`
+      })}
+      ${metric("VAN", eur(eco.van), "Valor actual neto", eco.van >= 0 ? "good" : "bad", {
+        formula: "VAN = Σ(t=1..N) F_t / (1+r)^t − CAPEX",
+        substitution: `Σ de ${num(p.years)} flujos al ${num(p.discount,1)} % − ${eur(eco.capex)} = ${eur(eco.van,2)}`
+      })}
+      ${metric("TIR", eco.tir !== null ? `${num(eco.tir * 100, 2)} %` : "—", "Tasa interna de retorno", "", {
+        formula: "TIR: r tal que VAN(r) = 0",
+        substitution: eco.tir !== null ? `Bisección sobre el VAN = ${num(eco.tir * 100, 2)} %` : "Sin cambio de signo en el rango analizado."
+      })}
+      ${metric("Payback", eco.payback !== null ? `${num(eco.payback,1)} años` : "> horizonte", "Retorno simple")}
+      ${metric("Payback descontado", eco.discountedPayback !== null ? `${num(eco.discountedPayback,1)} años` : "> horizonte", "Con tasa de descuento")}
+      ${metric("LCOE", eco.lcoe !== null ? `${num(eco.lcoe * 100, 2)} c€/kWh` : "—", "Coste nivelado")}
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Concepto</th><th>Valor anual</th></tr></thead>
+        <tbody>
+          <tr><td>Ahorro bruto primer año</td><td>${eur(t.grossSaving, 2)}</td></tr>
+          <tr><td>Mantenimiento (OPEX)</td><td>−${eur(p.opex, 2)}</td></tr>
+          <tr><td>Ahorro neto primer año</td><td>${eur(t.netSaving, 2)}</td></tr>
+          <tr><td>Pérdidas de batería</td><td>${num(t.batteryLoss, 1)} kWh/año</td></tr>
+          <tr><td>Energía recortada por inversor</td><td>${num(t.clipped, 1)} kWh/año</td></tr>
+          <tr><td>Producción DC estimada</td><td>${num(t.pvDc, 0)} kWh/año</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="card-sub" style="margin-top:10px">${escapeHTML(lifeNote)}</p>`;
+
+  renderCharts(result);
+}
+
+
+/* ======================== 11. GRÁFICAS =================================== */
+
+function renderCharts(result){
+  if (!chartsAvailable) return;
+  const monthly = result.selected.monthly;
+  const scenarios = result.scenarios;
+
+  const ctxM = $("monthlyChartCanvas").getContext("2d");
+  if (monthlyChart) monthlyChart.destroy();
+  monthlyChart = new Chart(ctxM, {
+    type: "bar",
+    data: {
+      labels: MONTHS,
+      datasets: [
+        { label:"FV AC (kWh)", data: monthly.map(m => m.pv),     backgroundColor:"#f5b942", borderRadius:4 },
+        { label:"Demanda (kWh)", data: monthly.map(m => m.load), backgroundColor:"#1a3c5a", borderRadius:4 },
+        { label:"Compra (kWh)",  data: monthly.map(m => m.grid), backgroundColor:"#7aa7c7", borderRadius:4 },
+        { label:"Excedente (kWh)", data: monthly.map(m => m.export), backgroundColor:"#2f9e6f", borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:"bottom", labels:{ boxWidth:12, font:{ size:11 } } } },
+      scales:{ y:{ beginAtZero:true, title:{ display:true, text:"kWh" } } }
+    }
+  });
+
+  const ctxB = $("batteryChartCanvas").getContext("2d");
+  if (batteryChart) batteryChart.destroy();
+  batteryChart = new Chart(ctxB, {
+    type: "bar",
+    data: {
+      labels: scenarios.map(s => `${num(s.capacity,1)} kWh`),
+      datasets: [
+        { label:"Compra de red (kWh/año)", data: scenarios.map(s => s.total.grid), backgroundColor:"#2877a2", borderRadius:4 },
+        { label:"Excedente (kWh/año)",     data: scenarios.map(s => s.total.export), backgroundColor:"#2f9e6f", borderRadius:4 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false, indexAxis:"y",
+      plugins:{ legend:{ position:"bottom", labels:{ boxWidth:12, font:{ size:11 } } } },
+      scales:{ x:{ beginAtZero:true, title:{ display:true, text:"kWh/año" } } }
+    }
+  });
+
+  const ctxC = $("cashflowChartCanvas").getContext("2d");
+  if (cashflowChart) cashflowChart.destroy();
+  const rows = result.economics.rows;
+  cashflowChart = new Chart(ctxC, {
+    type: "line",
+    data: {
+      labels: ["0", ...rows.map(r => String(r.year))],
+      datasets: [
+        { label:"Flujo acumulado (€)", data:[-result.economics.capex, ...rows.map(r => r.cum)],
+          borderColor:"#f5b942", backgroundColor:"rgba(245,185,66,.18)", fill:true, tension:.25, pointRadius:0 },
+        { label:"VAN acumulado (€)", data:[-result.economics.capex, ...rows.map(r => r.van)],
+          borderColor:"#2877a2", borderDash:[5,4], fill:false, tension:.25, pointRadius:0 }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:"bottom", labels:{ boxWidth:12, font:{ size:11 } } } },
+      scales:{ y:{ title:{ display:true, text:"€" } }, x:{ title:{ display:true, text:"Año" } } }
+    }
+  });
+}
+
+/* ======================== 12. EXPORTACIÓN ================================ */
+
+function exportMonthlyCSV(result){
+  const p = result.input, s = result.selected;
+  const lines = ["Mes;FV_AC_kWh;Demanda_kWh;Directo_kWh;Bateria_kWh;Compra_kWh;Excedente_kWh;Coste_base_EUR;Coste_real_EUR"];
+  s.monthly.forEach((m, i) => {
+    lines.push([MONTHS[i], dot(m.pv,1), dot(m.load,1), dot(m.direct,1), dot(m.batteryOut,1),
+                dot(m.grid,1), dot(m.export,1), dot(m.baselineCost,2), dot(m.actualCost,2)].join(";"));
+  });
+  lines.push(["TOTAL", dot(s.total.pv,1), dot(s.total.load,1), dot(s.total.direct,1), dot(s.total.batteryOut,1),
+              dot(s.total.grid,1), dot(s.total.export,1), dot(s.total.baselineCost,2), dot(s.total.actualCost,2)].join(";"));
+  download(`balance-mensual-${slug(p.name)}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+}
+
+function exportHourlyCSV(result){
+  const s = result.selected;
+  if (!s.hourly){ setMessage("No hay serie horaria disponible.", "warn"); return; }
+  const lines = ["Hora;Mes;Hora_dia;Demanda_kWh;FV_AC_kWh;Directo_kWh;Bateria_carga_kWh;Bateria_descarga_kWh;Compra_kWh;Excedente_kWh;SOC_kWh"];
+  for (const h of s.hourly){
+    lines.push([h.index, h.month, h.hour, dot(h.load,3), dot(h.pv,3), dot(h.direct,3),
+                dot(h.batteryIn,3), dot(h.batteryOut,3), dot(h.grid,3), dot(h.export,3), dot(h.soc,3)].join(";"));
+  }
+  download(`balance-horario-${slug(result.input.name)}.csv`, lines.join("\n"), "text/csv;charset=utf-8");
+}
+
+function exportBOM(result){
+  const p = result.input, cab = result.cabling, tech = result.technical;
+  const rows = [
+    ["Elemento","Descripción","Cantidad","Unidad","Notas"],
+    ["Módulo FV", `${p.moduleW} Wp, ${num(p.moduleWidth,2)}×${num(p.moduleLength,2)} m`, p.modules, "ud", `${num(tech.pvKWp,2)} kWp`],
+    ["Inversor", `${num(p.inverterKW,1)} kW AC`, 1, "ud", `${p.strings} strings`],
+    ["Batería", `${num(p.battery,1)} kWh útiles`, p.battery > 0 ? 1 : 0, "ud", BATTERY_TECH[p.batteryType]?.label || "—"],
+    ["Cable DC", `Cu ${cab.dcSec || "?"} mm²`, num(cab.dcLengthTotal,1), "m", "2 conductores"],
+    ["Cable AC", `Cu ${cab.acSec || "?"} mm²`, num(cab.acLengthTotal,1), "m", p.acSystem === "three" ? "Trifásico" : "Monofásico"],
+    ["Portafusibles DC", "Con fusible gPV por string", p.strings, "ud", "Verificar calibre"],
+    ["Seccionador DC", "Cortacircuitos DC", 1, "ud", "—"],
+    ["Protección AC", "Magnetotérmico + diferencial", 1, "ud", "Según REBT"],
+    ["Protección sobretensiones", "DC y AC", 2, "ud", "Tipo 2 orientativo"],
+    ["Estructura de montaje", "Coplanar o inclinada", p.modules, "ud", "Verificar cargas"],
+    ["Puesta a tierra", "Kit completo", 1, "ud", "—"],
+    ["Monitorización", "Medidor + pasarela", 1, "ud", "Opcional"],
+    ["Mano de obra y legalización", "Instalación y trámites", 1, "ud", "No incluido en CAPEX"]
+  ];
+  download(`lista-materiales-${slug(p.name)}.csv`,
+    rows.map(r => r.join(";")).join("\n"), "text/csv;charset=utf-8");
+}
+
+/** Genera un DXF R12 en planta con la disposición de módulos. */
+function exportDXF(result){
+  const p = result.input;
+  const L = [];
+  const w = (code, val) => { L.push(String(code)); L.push(String(val)); };
+  const f = v => Number(v).toFixed(4);
+
+  w(0,"SECTION"); w(2,"HEADER"); w(9,"$ACADVER"); w(1,"AC1009"); w(0,"ENDSEC");
+  w(0,"SECTION"); w(2,"TABLES");
+  w(0,"TABLE"); w(2,"LAYER"); w(70,3);
+  [["MODULOS",3],["COTAS",1],["TEXTO",7]].forEach(([name,color]) => {
+    w(0,"LAYER"); w(2,name); w(70,0); w(62,color); w(6,"CONTINUOUS");
+  });
+  w(0,"ENDTAB"); w(0,"ENDSEC");
+
+  w(0,"SECTION"); w(2,"ENTITIES");
+  const line = (x1,y1,x2,y2,layer) => {
+    w(0,"LINE"); w(8,layer);
+    w(10,f(x1)); w(20,f(y1)); w(30,"0.0");
+    w(11,f(x2)); w(21,f(y2)); w(31,"0.0");
+  };
+  const text = (x,y,h,txt,layer) => {
+    w(0,"TEXT"); w(8,layer);
+    w(10,f(x)); w(20,f(y)); w(30,"0.0"); w(40,f(h)); w(1,String(txt));
+  };
+
+  const perRow = Math.max(1, Math.round(p.modulesPerRow));
+  const rows = Math.ceil(p.modules / perRow);
+  const mw = p.moduleWidth, ml = p.moduleLength;
+  const beta = rad(p.tilt), alpha = rad(p.designElevation);
+  const pitch = ml * Math.cos(beta) + ml * Math.sin(beta) / Math.tan(alpha);
+  const gap = 0.02;
+
+  let n = 0;
+  for (let r = 0; r < rows; r++){
+    const y0 = r * pitch;
+    const count = Math.min(perRow, p.modules - r * perRow);
+    for (let c = 0; c < count; c++){
+      const x0 = c * (mw + gap);
+      line(x0, y0, x0+mw, y0, "MODULOS");
+      line(x0+mw, y0, x0+mw, y0+ml, "MODULOS");
+      line(x0+mw, y0+ml, x0, y0+ml, "MODULOS");
+      line(x0, y0+ml, x0, y0, "MODULOS");
+      n++;
+    }
+  }
+
+  const totalW = perRow * (mw + gap);
+  const totalD = (rows - 1) * pitch + ml;
+  line(0, -0.6, totalW, -0.6, "COTAS");
+  text(totalW/2 - 0.4, -0.55, 0.18, `${num(totalW,2)} m`, "TEXTO");
+  line(-0.6, 0, -0.6, totalD, "COTAS");
+  text(-1.9, totalD/2, 0.18, `${num(totalD,2)} m`, "TEXTO");
+  text(0, totalD + 0.5, 0.22, `Solar Layunta - ${p.name}`, "TEXTO");
+  text(0, totalD + 0.2, 0.18,
+       `${p.modules} modulos | ${num(p.tilt,0)} deg inclinacion | paso ${num(pitch,2)} m | altura diseno ${num(p.designElevation,0)} deg`,
+       "TEXTO");
+
+  w(0,"ENDSEC"); w(0,"EOF");
+  download(`plano-${slug(p.name)}.dxf`, L.join("\n"), "application/dxf");
+}
+
+function exportJSON(result){
+  const payload = {
+    app: "Solar Layunta", version: APP_VERSION, generated: new Date().toISOString(),
+    input: result.input,
+    technical: result.technical,
+    cabling: result.cabling,
+    economics: { capex: result.economics.capex, van: result.economics.van, tir: result.economics.tir,
+                 payback: result.economics.payback, lcoe: result.economics.lcoe },
+    scenarios: result.scenarios.map(s => ({ capacity: s.capacity, total: s.total })),
+    selectedMonthly: result.selected.monthly
+  };
+  download(`proyecto-${slug(result.input.name)}.json`, JSON.stringify(payload, null, 2), "application/json");
+}
+
+function slug(str){
+  return String(str).normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-zA-Z0-9]+/g,"-").replace(/^-+|-+$/g,"").toLowerCase() || "proyecto";
+}
+
+/** Informe PDF: oculta elementos no imprimibles y usa html2pdf o el diálogo de impresión. */
+function generatePDF(){
+  const area = $("pdfExportArea");
+  const hidden = [];
+  area.querySelectorAll(".no-print").forEach(el => {
+    hidden.push([el, el.style.display]);
+    el.style.display = "none";
+  });
+
+  const restore = () => hidden.forEach(([el, d]) => { el.style.display = d; });
+
+  if (typeof html2pdf === "undefined"){
+    window.print();
+    restore();
+    return;
+  }
+  html2pdf().from(area).set({
+    margin: [10,10,10,10],
+    filename: `informe-${slug(lastResult?.input?.name || "solar")}.pdf`,
+    image: { type:"jpeg", quality:0.98 },
+    html2canvas: { scale:2, useCORS:true, backgroundColor:"#ffffff" },
+    jsPDF: { unit:"mm", format:"a4", orientation:"portrait" },
+    pagebreak: { mode:["css","legacy"] }
+  }).save().then(restore).catch(() => { restore(); window.print(); });
+}
+
+/* ==================== 13. GESTIÓN DE PROYECTOS =========================== */
+
+const PROJECTS_KEY = "solar-layunta-projects-v3";
+const THEME_KEY = "solar-layunta-theme";
+const SCHEMA_VERSION = 3;
+
+/**
+ * Migra un proyecto guardado a la versión de esquema actual.
+ * Rellena campos ausentes con los valores por defecto de SECTIONS.
+ */
+function migrateProject(data){
+  if (!data || typeof data !== "object") return data;
+  const from = Number(data.schemaVersion) || 1;
+
+  // v1 → v2: los proyectos antiguos no guardaban el uso de la instalación.
+  if (from < 2 && data.profile === undefined) data.profile = "residential";
+
+  // v2 → v3: se añadieron la potencia PVGIS y las baterías candidatas.
+  if (from < 3){
+    if (data.pvgisPeak === undefined)
+      data.pvgisPeak = (data.modules && data.moduleW) ? data.modules * data.moduleW / 1000 : 5.4;
+    if (data.candidate1 === undefined) data.candidate1 = 10;
+    if (data.candidate2 === undefined) data.candidate2 = 15;
+  }
+
+  // Relleno defensivo: cualquier campo ausente toma el valor por defecto actual.
+  for (const sec of SECTIONS) for (const f of sec.fields){
+    if (data[f.id] === undefined) data[f.id] = f.value;
+  }
+
+  data.schemaVersion = SCHEMA_VERSION;
+  return data;
+}
+
+function getSavedProjects(){
+  try { return JSON.parse(localStorage.getItem(PROJECTS_KEY)) || {}; }
+  catch { return {}; }
+}
+
+function updateProjectSelector(){
+  const projects = getSavedProjects();
+  const sel = $("projectSelector");
+  sel.innerHTML = '<option value="">— Seleccionar proyecto guardado —</option>';
+  Object.keys(projects).sort().forEach(name => {
+    const opt = document.createElement("option");
+    opt.value = name; opt.textContent = name;
+    sel.appendChild(opt);
+  });
+}
+
+function saveCurrentProject(customName){
+  try {
+    const inputs = readInputs();
+    const name = customName || inputs.name || "Proyecto sin nombre";
+    const projects = getSavedProjects();
+    projects[name] = { ...inputs, schemaVersion: SCHEMA_VERSION };
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    updateProjectSelector();
+    setMessage(`Proyecto "${name}" guardado correctamente.`, "ok");
+  } catch (e){
+    setMessage("Error al guardar: " + e.message, "bad");
+  }
+}
+
+function loadSelectedProject(){
+  const name = $("projectSelector").value;
+  if (!name) { setMessage("Selecciona un proyecto para cargar.", "warn"); return; }
+  const raw = getSavedProjects()[name];
+  if (!raw) { setMessage("El proyecto no existe.", "bad"); return; }
+  const data = migrateProject(raw);
+  for (const sec of SECTIONS) for (const f of sec.fields){
+    if (data[f.id] !== undefined && $(f.id)) $(f.id).value = data[f.id];
+  }
+  calculateAndRender();
+  setMessage(`Proyecto "${name}" cargado.`, "ok");
+}
+
+function deleteSelectedProject(){
+  const name = $("projectSelector").value;
+  if (!name) { setMessage("Selecciona un proyecto para eliminar.", "warn"); return; }
+  if (!confirm(`¿Eliminar el proyecto "${name}"?`)) return;
+  const projects = getSavedProjects();
+  delete projects[name];
+  localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+  updateProjectSelector();
+  setMessage(`Proyecto "${name}" eliminado.`, "ok");
+}
+
+/* ======================== 14. FORMULARIO ================================= */
+
+function createForm(){
+  const container = $("formSections");
+  container.innerHTML = "";
+  for (const sec of SECTIONS){
+    const details = document.createElement("details");
+    details.open = !!sec.open;
+
+    const summary = document.createElement("summary");
+    summary.textContent = sec.title;
+    details.appendChild(summary);
+
+    const fieldsDiv = document.createElement("div");
+    fieldsDiv.className = "fields";
+
+    for (const f of sec.fields){
+      const label = document.createElement("label");
+      const caption = document.createElement("span");
+      caption.textContent = f.label;
+      label.appendChild(caption);
+
+      let input;
+      if (f.type === "select"){
+        input = document.createElement("select");
+        for (const [val, txt] of f.options){
+          const opt = document.createElement("option");
+          opt.value = val; opt.textContent = txt;
+          input.appendChild(opt);
+        }
+        input.value = f.value;
+      } else {
+        input = document.createElement("input");
+        input.type = f.type;
+        input.value = f.value;
+        if (f.type === "number"){
+          if (f.min !== undefined) input.min = f.min;
+          if (f.max !== undefined) input.max = f.max;
+          if (f.step !== undefined) input.step = f.step;
+        }
+      }
+      input.id = f.id;
+      input.name = f.id;
+      label.appendChild(input);
+      fieldsDiv.appendChild(label);
+    }
+    details.appendChild(fieldsDiv);
+    container.appendChild(details);
+  }
+
+  // Autorrelleno por provincia y desactivación al editar manualmente.
+  $("province").addEventListener("change", () => {
+    const prov = PROVINCES[$("province").value];
+    if (!prov) return;
+    $("lat").value = prov.lat;
+    $("ghis").value = prov.ghi.join(", ");
+  });
+  ["lat","ghis"].forEach(id => $(id).addEventListener("input", () => { $("province").value = ""; }));
+}
+
+function readInputs(){
+  const out = {};
+  for (const sec of SECTIONS) for (const f of sec.fields){
+    const el = $(f.id);
+    out[f.id] = f.type === "number" ? Number(el.value) : el.value.trim();
+  }
+  out.ghi = out.ghis.split(/[;,]/).map(v => Number(v.trim()));
+  return out;
+}
+
+/* ==================== 15. CÁLCULO Y RENDER =============================== */
+
+let lastResult = null;
+
+function calculateAndRender(){
+  const form = $("projectForm");
+  if (!form.checkValidity()){ form.reportValidity(); return false; }
+
+  try {
+    const input = readInputs();
+    const { errors, warnings } = validateInputs(input);
+    if (errors.length){
+      setMessage("Revisa la configuración: " + errors.join(" "), "bad");
+      return false;
+    }
+
+    const series = makeEnergySeries(input);
+    const capacities = [...new Set([0, input.battery, input.candidate1, input.candidate2])]
+      .filter(v => Number.isFinite(v) && v >= 0)
+      .sort((a,b) => a - b);
+
+    const scenarios = capacities.map(cap => {
+      const sim = simulate(input, series, cap, cap === input.battery);
+      sim.economics = economics(input, sim);
+      return sim;
+    });
+
+    const selected = scenarios.find(s => s.capacity === input.battery) || scenarios[0];
+    const technical = technicalAnalysis(input);
+    const cabling = cableSizing(input, technical);
+
+        lastResult = { input, selected, scenarios, technical, cabling, economics: selected.economics };
+
+    // Los resultados del Monte Carlo anteriores quedan obsoletos al recalcular.
+    $("uncertainty").innerHTML = "";
+    $("uncertaintyCard").classList.add("no-print");
+
+    render(lastResult);
+
+
+    setMessage(warnings.length
+      ? "Simulación calculada. Avisos: " + warnings.join(" ")
+      : "Simulación calculada correctamente.", warnings.length ? "warn" : "ok");
+    return true;
+  } catch (err){
+    setMessage("Error de cálculo: " + err.message, "bad");
+    return false;
+  }
+}
+
+/* ==================== 16. EVENTOS E INICIALIZACIÓN ======================= */
+/** Lanza el análisis de incertidumbre sobre los parámetros del último cálculo. */
+function runMonteCarlo(){
+  if (!lastResult){
+    setMessage("Calcula primero la simulación antes de lanzar el Monte Carlo.", "warn");
+    return;
+  }
+  const box = $("uncertainty");
+  const btn = $("mcBtn");
+  btn.disabled = true;
+  box.innerHTML = `<p class="card-sub">Ejecutando 300 escenarios… puede tardar unos segundos.</p>`;
+
+  setTimeout(() => {
+    try {
+      const p = lastResult.input;
+      const mc = monteCarlo(p, 300);
+      const base = lastResult.economics.van;
+      const cls = v => v >= 0 ? "good" : "bad";
+
+      box.innerHTML = `
+        <div class="metrics">
+          ${metric("VAN P10", eur(mc.p10), "Escenario pesimista", cls(mc.p10), {
+            formula: "Percentil 10 de la distribución de VAN",
+            substitution: `${mc.n} escenarios, semilla ${mc.seed} → P10 = ${eur(mc.p10, 2)}`
+          })}
+          ${metric("VAN P50", eur(mc.p50), "Mediana", cls(mc.p50), {
+            formula: "Percentil 50 (mediana) de la distribución de VAN",
+            substitution: `${mc.n} escenarios → P50 = ${eur(mc.p50, 2)}`
+          })}
+          ${metric("VAN P90", eur(mc.p90), "Escenario optimista", cls(mc.p90), {
+            formula: "Percentil 90 de la distribución de VAN",
+            substitution: `${mc.n} escenarios → P90 = ${eur(mc.p90, 2)}`
+          })}
+          ${metric("Probabilidad VAN > 0", `${num(mc.probPositive, 1)} %`, "Escenarios favorables", mc.probPositive >= 50 ? "good" : "bad", {
+            formula: "P(VAN ≥ 0) = nº de escenarios con VAN ≥ 0 / n",
+            substitution: `${num(mc.probPositive * mc.n / 100, 0)} de ${mc.n} escenarios = ${num(mc.probPositive, 1)} %`
+          })}
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Estadístico</th><th>VAN</th></tr></thead>
+            <tbody>
+              <tr><td>Mínimo</td><td>${eur(mc.min)}</td></tr>
+              <tr><td>P10</td><td>${eur(mc.p10)}</td></tr>
+              <tr><td>Mediana (P50)</td><td>${eur(mc.p50)}</td></tr>
+              <tr><td>Media</td><td>${eur(mc.mean)}</td></tr>
+              <tr><td>P90</td><td>${eur(mc.p90)}</td></tr>
+              <tr><td>Máximo</td><td>${eur(mc.max)}</td></tr>
+              <tr><td>VAN determinista</td><td>${eur(base)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="card-sub" style="margin-top:10px">
+          Perturbaciones gaussianas sobre GHI (±4 %), consumo (±7 %), precio diurno (±12 %) y degradación (±15 %).
+          Semilla fija ${mc.seed} para reproducibilidad.
+                </p>`;
+      $("uncertaintyCard").classList.remove("no-print");
+    } catch (err){
+
+      box.innerHTML = `<p class="card-sub">Error en el Monte Carlo: ${escapeHTML(err.message)}</p>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }, 50);
+}
+
+function bindEvents(){
+  $("projectForm").addEventListener("submit", e => { e.preventDefault(); calculateAndRender(); });
+  $("saveBtn").addEventListener("click", () => saveCurrentProject());
+  $("saveAsProjectBtn").addEventListener("click", () => {
+    const name = prompt("Nombre único para el proyecto:", $("name").value);
+    if (name) saveCurrentProject(name);
+  });
+  $("loadProjectBtn").addEventListener("click", loadSelectedProject);
+  $("deleteProjectBtn").addEventListener("click", deleteSelectedProject);
+
+  $("resetBtn").addEventListener("click", () => {
+    if (!confirm("¿Restablecer valores por defecto y borrar los proyectos guardados?")) return;
+    localStorage.removeItem(PROJECTS_KEY);
+    location.reload();
+  });
+
+  // Importadores
+  $("loadFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      importedLoad = parseLoadCSV(await file.text());
+      $("loadStatus").textContent = `Curva cargada: ${file.name} (8.760 valores).`;
+      calculateAndRender();
+    } catch (err){
+      importedLoad = null; e.target.value = "";
+      $("loadStatus").textContent = "Error: " + err.message;
+      setMessage("Curva de consumo: " + err.message, "bad");
+    }
+  });
+  $("solarFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      importedSolar = parseSolarJSON(await file.text());
+      $("solarStatus").textContent = `Producción cargada: ${file.name}.`;
+      calculateAndRender();
+    } catch (err){
+      importedSolar = null; e.target.value = "";
+      $("solarStatus").textContent = "Error: " + err.message;
+      setMessage("Producción PVGIS: " + err.message, "bad");
+    }
+  });
+  $("tariffFile").addEventListener("change", async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      importedTariff = parseTariffCSV(await file.text());
+      $("tariffStatus").textContent = `Precios cargados: ${file.name}.`;
+      calculateAndRender();
+    } catch (err){
+      importedTariff = null; e.target.value = "";
+      $("tariffStatus").textContent = "Error: " + err.message;
+      setMessage("Precios horarios: " + err.message, "bad");
+    }
+  });
+
+  $("clearLoad").addEventListener("click", () => {
+    importedLoad = null; $("loadFile").value = "";
+    $("loadStatus").textContent = "Se usará un perfil sintético."; calculateAndRender();
+  });
+  $("clearSolar").addEventListener("click", () => {
+    importedSolar = null; $("solarFile").value = "";
+    $("solarStatus").textContent = "Se usará el modelo solar analítico."; calculateAndRender();
+  });
+  $("clearTariff").addEventListener("click", () => {
+    importedTariff = null; $("tariffFile").value = "";
+    $("tariffStatus").textContent = "Se usarán los precios del formulario."; calculateAndRender();
+  });
+
+  // Exportaciones
+  $("pdfBtn").addEventListener("click", generatePDF);
+  $("csvBtn").addEventListener("click", () => lastResult && exportMonthlyCSV(lastResult));
+  $("hourlyBtn").addEventListener("click", () => lastResult && exportHourlyCSV(lastResult));
+  $("bomBtn").addEventListener("click", () => lastResult && exportBOM(lastResult));
+  $("dxfBtn").addEventListener("click", () => lastResult && exportDXF(lastResult));
+  $("jsonBtn").addEventListener("click", () => lastResult && exportJSON(lastResult));
+
+  // Incertidumbre
+  $("mcBtn").addEventListener("click", runMonteCarlo);
+
+  // Tema
+  $("themeToggle").addEventListener("click", () => {
+    const next = document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark";
+    applyTheme(next);
+  });
+}
+
+function applyTheme(theme){
+  document.documentElement.setAttribute("data-theme", theme);
+  const btn = $("themeToggle");
+  btn.textContent = theme === "dark" ? "☀️ Modo claro" : "🌓 Modo oscuro";
+  btn.setAttribute("aria-pressed", theme === "dark" ? "true" : "false");
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+}
+
+function initTheme(){
+  let theme = null;
+  try { theme = localStorage.getItem(THEME_KEY); } catch {}
+  if (!theme){
+    theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  applyTheme(theme);
+}
+
+function init(){
+  $("appVersion").textContent = "v" + APP_VERSION;
+
+  chartsAvailable = typeof Chart !== "undefined";
+  if (!chartsAvailable){
+    ["monthlyChartFallback","batteryChartFallback","cashflowChartFallback"].forEach(id => {
+      const el = $(id); if (el) el.style.display = "block";
+    });
+    document.querySelectorAll(".chart-container").forEach(el => { el.style.display = "none"; });
+  }
+ initTheme();
+  createForm();
+  updateProjectSelector();
+  bindEvents();
+  calculateAndRender();
+
+  if ("serviceWorker" in navigator && window.isSecureContext){
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("./sw.js").catch(e => console.warn("SW:", e));
+    });
+  }
+}
+
+function confidenceLevel(){
+  const synthetic = [];
+  if (!importedLoad)   synthetic.push("curva de consumo sintética");
+  if (!importedSolar)  synthetic.push("producción solar modelada");
+  if (!importedTariff) synthetic.push("tarifa simplificada de dos precios");
+  if (!synthetic.length) return { level:"Alta",  note:"Series horarias aportadas por el usuario." };
+  if (synthetic.length === 1) return { level:"Media", note:"Falta: " + synthetic.join(", ") + "." };
+  return { level:"Orientativa", note:"Basado en: " + synthetic.join(", ") + "." };
+}
+function mulberry32(a){
+  return function(){
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function monteCarlo(p, n = 300, seed = 20261115){
+  const rnd = mulberry32(seed);
+  const gauss = () => {
+    let u = 0, v = 0;
+    while (u === 0) u = rnd();
+    while (v === 0) v = rnd();
+    return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+  };
+  // Sigmas declaradas y justificadas en la memoria metodológica.
+  const SIGMA = { ghi:0.04, dailyLoad:0.07, dayPrice:0.12, degradation:0.15 };
+
+  const vans = [];
+  for (let i = 0; i < n; i++){
+    const q = { ...p };
+    q.dailyLoad   = Math.max(0, p.dailyLoad   * (1 + gauss() * SIGMA.dailyLoad));
+    q.dayPrice    = Math.max(0, p.dayPrice    * (1 + gauss() * SIGMA.dayPrice));
+    q.degradation = Math.max(0, p.degradation * (1 + gauss() * SIGMA.degradation));
+    q.ghi = p.ghi.map(v => Math.max(0, v * (1 + gauss() * SIGMA.ghi)));
+    const s = simulate(q, makeEnergySeries(q), q.battery, false);
+    vans.push(economics(q, s).van);
+  }
+  vans.sort((a,b) => a - b);
+  const at = q => vans[Math.min(vans.length - 1, Math.floor(q * vans.length))];
+  const mean = sum(vans) / vans.length;
+  const probPositive = vans.filter(v => v >= 0).length / vans.length * 100;
+
+  return { n, seed, mean, probPositive,
+           p10:at(0.10), p50:at(0.50), p90:at(0.90),
+           min:vans[0], max:vans[vans.length - 1] };
+}
+
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

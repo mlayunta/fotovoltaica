@@ -1,0 +1,35 @@
+{
+  "name": "Solar Layunta · Ingeniería solar avanzada",
+  "short_name": "Solar Layunta",
+  "description": "Predimensionamiento fotovoltaico profesional: simulación horaria de 8.760 intervalos, almacenamiento y análisis económico (VAN, TIR, LCOE).",
+  "lang": "es-ES",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#10243b",
+  "categories": ["utilities", "productivity", "engineering"],
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuevo cálculo",
+      "short_name": "Calcular",
+      "url": "./index.html"
+    }
+  ]
+}
